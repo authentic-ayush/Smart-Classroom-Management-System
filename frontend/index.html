@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SCMS Portal — IET Lucknow</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    const INITIAL_SUBJECTS = [
+      { code: 'BCS-301', name: 'Data Structures & Algorithms', attended: 28, total: 32, faculty: 'Prof. R. K. Sharma', room: 'LH-201' },
+      { code: 'BCS-302', name: 'Computer Organization & Architecture', attended: 24, total: 28, faculty: 'Dr. S. Verma', room: 'LH-202' },
+      { code: 'BCS-303', name: 'Discrete Structures & Theory of Logic', attended: 21, total: 26, faculty: 'Prof. A. Mishra', room: 'LH-201' },
+      { code: 'BOE-310', name: 'Digital Electronics', attended: 19, total: 25, faculty: 'Dr. P. Singh', room: 'LH-104' },
+      { code: 'BVE-301', name: 'Universal Human Values & Ethics', attended: 16, total: 18, faculty: 'Prof. N. Gupta', room: 'Seminar Hall' }
+    ];
+
+    const INITIAL_TIMETABLE = [
+      { id: 1, time: '09:00 AM - 10:00 AM', code: 'BCS-301', subject: 'Data Structures & Algorithms', room: 'LH-201', status: 'Scheduled' },
+      { id: 2, time: '10:00 AM - 11:00 AM', code: 'BCS-302', subject: 'Computer Organization & Architecture', room: 'LH-202', status: 'Scheduled' },
+      { id: 3, time: '11:15 AM - 12:15 PM', code: 'BCS-303', subject: 'Discrete Structures & Theory of Logic', room: 'LH-201', status: 'Rescheduled to LH-204' },
+      { id: 4, time: '01:30 PM - 02:30 PM', code: 'BOE-310', subject: 'Digital Electronics', room: 'LH-104', status: 'Scheduled' },
+      { id: 5, time: '02:30 PM - 03:30 PM', code: 'BVE-301', subject: 'Universal Human Values & Ethics', room: 'Seminar Hall', status: 'Scheduled' }
+    ];
+
+    const INITIAL_ASSIGNMENTS = [
+      { id: 1, code: 'BCS-301', title: 'Implement Singly & Doubly Linked List Operations in C++', dueDate: '2026-11-25', submitted: true, grade: '19/20' },
+      { id: 2, code: 'BCS-302', title: 'Design 4-bit Arithmetic Logic Unit (ALU) Combinational Circuit', dueDate: '2026-11-28', submitted: false, grade: 'Pending' },
+      { id: 3, code: 'BCS-303', title: 'Propositional Logic & Hasse Diagram Problem Set #3', dueDate: '2026-11-30', submitted: false, grade: 'Pending' }
+    ];
+
+    const INITIAL_NOTICES = [
+      { id: 1, title: 'Mid-Semester Test-2 (CT-2) Schedule Released', category: 'Examination', date: 'Nov 18, 2026', author: 'COE Office' },
+      { id: 2, title: 'Smart India Hackathon Internal Screening Round in Seminar Hall', category: 'Technical Event', date: 'Nov 16, 2026', author: 'CSE Department' },
+      { id: 3, title: 'Extra Lab Session for Data Structures (BCS-351) on Saturday', category: 'Academic', date: 'Nov 15, 2026', author: 'Prof. R. K. Sharma' }
+    ];
+
+    function App() {
+      const [role, setRole] = useState('student');
+      const [activeTab, setActiveTab] = useState('dashboard');
+      const [subjects, setSubjects] = useState(INITIAL_SUBJECTS);
+      const [timetable] = useState(INITIAL_TIMETABLE);
+      const [assignments, setAssignments] = useState(INITIAL_ASSIGNMENTS);
+      const [notices, setNotices] = useState(INITIAL_NOTICES);
+
+      const [activeSession, setActiveSession] = useState({
+        active: true,
+        courseCode: 'BCS-301',
+        otp: '4829',
+        expiresIn: 120,
+        markedByAyush: false
+      });
+
+      const [studentOtpInput, setStudentOtpInput] = useState('');
+      const [toastMessage, setToastMessage] = useState('');
+      const [selectedCourseForOtp, setSelectedCourseForOtp] = useState('BCS-301');
+      const [newNoticeTitle, setNewNoticeTitle] = useState('');
+      const [newAssignmentTitle, setNewAssignmentTitle] = useState('');
+      const [newAssignmentCourse, setNewAssignmentCourse] = useState('BCS-301');
+
+      const triggerToast = (msg) => {
+        setToastMessage(msg);
+        setTimeout(() => setToastMessage(''), 3500);
+      };
+
+      useEffect(() => {
+        if (!activeSession.active) return;
+        const timer = setInterval(() => {
+          setActiveSession((prev) => {
+            if (prev.expiresIn <= 1) return { ...prev, active: false, expiresIn: 0 };
+            return { ...prev, expiresIn: prev.expiresIn - 1 };
+          });
+        }, 1000);
+        return () => clearInterval(timer);
+      }, [activeSession.active]);
+
+      const totalAttended = subjects.reduce((acc, s) => acc + s.attended, 0);
+      const totalClasses = subjects.reduce((acc, s) => acc + s.total, 0);
+      const overallPercentage = ((totalAttended / totalClasses) * 100).toFixed(1);
+      const latestNotice = notices[0];
+
+      const handleGenerateOtp = () => {
+        const randomOtp = Math.floor(1000 + Math.random() * 9000).toString();
+        setActiveSession({
+          active: true,
+          courseCode: selectedCourseForOtp,
+          otp: randomOtp,
+          expiresIn: 120,
+          markedByAyush: false
+        });
+        triggerToast(`Live OTP ${randomOtp} generated for ${selectedCourseForOtp}!`);
+      };
+
+      const handleMarkAttendance = (mode = 'otp') => {
+        if (!activeSession.active) return triggerToast('No active attendance session running.');
+        if (activeSession.markedByAyush) return triggerToast('Attendance already marked!');
+        if (mode === 'otp' && studentOtpInput.trim() !== activeSession.otp) {
+          return triggerToast('Invalid OTP! Check the faculty session code.');
+        }
+        setSubjects((prev) =>
+          prev.map((sub) =>
+            sub.code === activeSession.courseCode
+              ? { ...sub, attended: sub.attended + 1, total: sub.total + 1 }
+              : sub
+          )
+        );
+        setActiveSession((prev) => ({ ...prev, markedByAyush: true }));
+        setStudentOtpInput('');
+        triggerToast(`Attendance verified for Ayush (2500520100122) in ${activeSession.courseCode}!`);
+      };
+
+      const handleSubmitAssignment = (id) => {
+        setAssignments((prev) =>
+          prev.map((a) => (a.id === id ? { ...a, submitted: true, grade: 'Submitted (Under Review)' } : a))
+        );
+        triggerToast('Assignment uploaded successfully by Ayush!');
+      };
+
+      const handleAddNotice = (e) => {
+        e.preventDefault();
+        if (!newNoticeTitle.trim()) return;
+        setNotices([
+          {
+            id: Date.now(),
+            title: newNoticeTitle,
+            category: 'Academic',
+            date: 'Just Now',
+            author: role === 'faculty' ? 'Prof. R. K. Sharma' : 'System Admin'
+          },
+          ...notices
+        ]);
+        setNewNoticeTitle('');
+        triggerToast('Notice broadcasted to all students!');
+      };
+
+      const handleCreateAssignment = (e) => {
+        e.preventDefault();
+        if (!newAssignmentTitle.trim()) return;
+        setAssignments([
+          {
+            id: Date.now(),
+            code: newAssignmentCourse,
+            title: newAssignmentTitle,
+            dueDate: '2026-12-01',
+            submitted: false,
+            grade: 'Pending'
+          },
+          ...assignments
+        ]);
+        setNewAssignmentTitle('');
+        triggerToast(`New assignment posted for ${newAssignmentCourse}!`);
+      };
+
+      return (
+        <div className="min-h-screen flex flex-col">
+          {toastMessage && (
+            <div className="fixed bottom-5 right-5 z-50 bg-indigo-600 text-white px-4 py-3 rounded-xl shadow-2xl border border-indigo-400">
+              <span className="text-sm font-medium">✨ {toastMessage}</span>
+            </div>
+          )}
+
+          {/* Top Bar */}
+          <header className="bg-slate-900 border-b border-slate-800 sticky top-0 z-40 px-6 py-3.5 flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="font-bold text-lg text-white">SCMS Portal</h1>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                  IET Lucknow • CSE
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">Smart Class Management System — Mini Project</p>
+            </div>
+
+            <div className="flex items-center gap-2 bg-slate-800 p-1 rounded-xl border border-slate-700">
+              <button
+                onClick={() => setRole('student')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${role === 'student' ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}
+              >
+                Student View (Ayush)
+              </button>
+              <button
+                onClick={() => setRole('faculty')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${role === 'faculty' ? 'bg-emerald-600 text-white' : 'text-slate-400'}`}
+              >
+                Faculty View
+              </button>
+              <button
+                onClick={() => setRole('admin')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${role === 'admin' ? 'bg-amber-600 text-white' : 'text-slate-400'}`}
+              >
+                Admin Console
+              </button>
+            </div>
+
+            <div className="hidden md:block text-right bg-slate-800/50 px-3.5 py-1.5 rounded-xl border border-slate-800">
+              <p className="text-xs font-semibold text-white">
+                {role === 'student' ? 'Ayush' : role === 'faculty' ? 'Prof. R. K. Sharma' : 'System Administrator'}
+              </p>
+              <p className="text-[11px] text-slate-400">
+                {role === 'student' ? 'Roll No: 2500520100122 • B.Tech CSE 2nd Yr' : 'Dept. of Computer Science & Engg.'}
+              </p>
+            </div>
+          </header>
+
+          {/* Main Layout */}
+          <div className="flex-1 flex flex-col md:flex-row max-w-7xl w-full mx-auto p-4 md:p-6 gap-6">
+            <aside className="w-full md:w-60 shrink-0">
+              <nav className="bg-slate-900 border border-slate-800 rounded-2xl p-3 space-y-1.5">
+                {[
+                  { id: 'dashboard', label: '📊 Dashboard Overview' },
+                  { id: 'attendance', label: '📱 Smart Attendance' },
+                  { id: 'timetable', label: '📅 Live Timetable' },
+                  { id: 'assignments', label: '📚 Assignments & Labs' },
+                  { id: 'notices', label: '🔔 Digital Notice Board' }
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveTab(item.id)}
+                    className={`w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                      activeTab === item.id ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-slate-800'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </nav>
+            </aside>
+
+            <main className="flex-1 space-y-6">
+              {/* Summary Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
+                  <p className="text-xs text-slate-400">Overall Attendance</p>
+                  <p className="text-2xl font-bold text-white mt-1">{overallPercentage}%</p>
+                  <p className="text-xs text-emerald-400 mt-1">{totalAttended}/{totalClasses} Lectures (Safe &gt;75%)</p>
+                </div>
+
+                <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
+                  <p className="text-xs text-slate-400">Live OTP Session</p>
+                  <p className="text-2xl font-bold text-white mt-1">{activeSession.active ? activeSession.courseCode : 'Idle'}</p>
+                  <p className="text-xs text-indigo-400 mt-1">
+                    {activeSession.active ? `OTP: ${activeSession.otp} (${activeSession.expiresIn}s)` : 'Waiting for Faculty'}
+                  </p>
+                </div>
+
+                <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
+                  <p className="text-xs text-slate-400">Pending Coursework</p>
+                  <p className="text-2xl font-bold text-white mt-1">{assignments.filter(a => !a.submitted).length} Tasks</p>
+                  <p className="text-xs text-slate-400 mt-1">B.Tech CSE 3rd Sem</p>
+                </div>
+
+                <div
+                  onClick={() => setActiveTab('notices')}
+                  className="bg-slate-900 border border-slate-800 hover:border-indigo-500 p-4 rounded-2xl cursor-pointer"
+                >
+                  <p className="text-xs text-rose-400 font-semibold">🔔 Latest Notice</p>
+                  <p className="text-sm font-bold text-white truncate mt-1">{latestNotice.title}</p>
+                  <p className="text-[11px] text-slate-400 mt-2">{latestNotice.category} • {latestNotice.date}</p>
+                </div>
+              </div>
+
+              {/* DASHBOARD TAB */}
+              {activeTab === 'dashboard' && (
+                <div className="space-y-6">
+                  <div className="bg-gradient-to-r from-indigo-900/60 to-slate-900 border border-indigo-500/30 rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                      <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        ● Active Smart Classroom Session
+                      </span>
+                      <h2 className="text-lg font-bold text-white mt-2">
+                        {activeSession.active ? `${activeSession.courseCode}: Attendance Window Open` : 'No Active Session'}
+                      </h2>
+                      <p className="text-xs text-slate-300 mt-1">
+                        Enter the 4-digit OTP displayed on the projector screen or simulate a QR scan.
+                      </p>
+                    </div>
+
+                    {role === 'student' && activeSession.active && !activeSession.markedByAyush && (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          maxLength={4}
+                          value={studentOtpInput}
+                          onChange={(e) => setStudentOtpInput(e.target.value)}
+                          placeholder={`OTP (${activeSession.otp})`}
+                          className="bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white w-36"
+                        />
+                        <button
+                          onClick={() => handleMarkAttendance('otp')}
+                          className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-xs font-semibold"
+                        >
+                          Verify OTP
+                        </button>
+                        <button
+                          onClick={() => handleMarkAttendance('qr')}
+                          className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-xl text-xs font-semibold border border-slate-700"
+                        >
+                          Simulate QR
+                        </button>
+                      </div>
+                    )}
+
+                    {activeSession.markedByAyush && (
+                      <div className="text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-4 py-2 rounded-xl text-xs font-semibold">
+                        ✓ Present Marked for Ayush (2500520100122)
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+                    <div>
+                      <h3 className="font-bold text-white text-base">Subject-Wise Attendance Analytics</h3>
+                      <p className="text-xs text-slate-400">Student: Ayush • Roll No: 2500520100122</p>
+                    </div>
+                    {subjects.map((sub) => {
+                      const pct = Math.round((sub.attended / sub.total) * 100);
+                      return (
+                        <div key={sub.code} className="bg-slate-950 border border-slate-800 p-3.5 rounded-xl">
+                          <div className="flex justify-between mb-2">
+                            <div>
+                              <span className="text-xs font-bold text-indigo-400 mr-2">{sub.code}</span>
+                              <span className="text-sm font-semibold text-white">{sub.name}</span>
+                              <p className="text-xs text-slate-400">{sub.faculty} • Room: {sub.room}</p>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-sm font-bold text-white">{pct}%</span>
+                              <p className="text-xs text-slate-400">{sub.attended}/{sub.total} lectures</p>
+                            </div>
+                          </div>
+                          <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                            <div className={`h-full ${pct >= 75 ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ width: `${pct}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* ATTENDANCE TAB */}
+              {activeTab === 'attendance' && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+                    <h3 className="font-bold text-white text-base">Faculty OTP / QR Session Controller</h3>
+                    <select
+                      value={selectedCourseForOtp}
+                      onChange={(e) => setSelectedCourseForOtp(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white"
+                    >
+                      {subjects.map((s) => (
+                        <option key={s.code} value={s.code}>{s.code} — {s.name}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={handleGenerateOtp}
+                      className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2.5 rounded-xl text-sm"
+                    >
+                      Generate New Live OTP & QR Session
+                    </button>
+                    {activeSession.active && (
+                      <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 text-center">
+                        <p className="text-xs text-slate-400">Active Session Code for {activeSession.courseCode}</p>
+                        <p className="text-4xl font-extrabold tracking-widest text-indigo-400 my-1">{activeSession.otp}</p>
+                        <p className="text-xs text-amber-400">Expires in {activeSession.expiresIn} seconds</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+                    <h3 className="font-bold text-white text-base">Student Check-In Terminal (Ayush)</h3>
+                    <p className="text-xs text-slate-400">Roll No: 2500520100122</p>
+                    <input
+                      type="text"
+                      maxLength={4}
+                      value={studentOtpInput}
+                      onChange={(e) => setStudentOtpInput(e.target.value)}
+                      placeholder={`Enter 4-digit OTP (Try ${activeSession.otp})`}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white"
+                    />
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => handleMarkAttendance('otp')}
+                        className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-2.5 rounded-xl text-xs font-semibold"
+                      >
+                        Submit OTP
+                      </button>
+                      <button
+                        onClick={() => handleMarkAttendance('qr')}
+                        className="flex-1 bg-slate-800 hover:bg-slate-700 text-white py-2.5 rounded-xl text-xs font-semibold border border-slate-700"
+                      >
+                        Scan Classroom QR
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TIMETABLE TAB */}
+              {activeTab === 'timetable' && (
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+                  <h3 className="font-bold text-white text-base mb-4">Dynamic Lecture Timetable</h3>
+                  <div className="space-y-2.5">
+                    {timetable.map((slot) => (
+                      <div key={slot.id} className="bg-slate-950 border border-slate-800 p-3.5 rounded-xl flex flex-wrap justify-between items-center gap-2">
+                        <div>
+                          <span className="text-xs font-bold text-indigo-400 mr-2">{slot.code}</span>
+                          <span className="text-sm font-semibold text-white">{slot.subject}</span>
+                          <p className="text-xs text-slate-400 mt-0.5">{slot.time} • Room: {slot.room}</p>
+                        </div>
+                        <span className={`text-xs px-2.5 py-0.5 rounded-full ${slot.status === 'Scheduled' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'}`}>
+                          {slot.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ASSIGNMENTS TAB */}
+              {activeTab === 'assignments' && (
+                <div className="space-y-6">
+                  {(role === 'faculty' || role === 'admin') && (
+                    <form onSubmit={handleCreateAssignment} className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3">
+                      <h4 className="font-bold text-white text-sm">Post New Coursework Assignment</h4>
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        <select
+                          value={newAssignmentCourse}
+                          onChange={(e) => setNewAssignmentCourse(e.target.value)}
+                          className="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
+                        >
+                          {subjects.map((s) => <option key={s.code} value={s.code}>{s.code}</option>)}
+                        </select>
+                        <input
+                          type="text"
+                          value={newAssignmentTitle}
+                          onChange={(e) => setNewAssignmentTitle(e.target.value)}
+                          placeholder="Assignment title..."
+                          className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white"
+                        />
+                        <button type="submit" className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-semibold">
+                          Publish
+                        </button>
+                      </div>
+                    </form>
+                  )}
+
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3">
+                    <h3 className="font-bold text-white text-base">Coursework & Lab Submissions (Ayush)</h3>
+                    {assignments.map((item) => (
+                      <div key={item.id} className="bg-slate-950 border border-slate-800 p-4 rounded-xl flex justify-between items-center gap-4">
+                        <div>
+                          <span className="text-xs font-bold text-indigo-400 mr-2">{item.code}</span>
+                          <span className="text-sm font-semibold text-white">{item.title}</span>
+                          <p className="text-xs text-slate-400 mt-1">Due: {item.dueDate} • Status: {item.grade}</p>
+                        </div>
+                        {item.submitted ? (
+                          <span className="text-xs px-3 py-1.5 rounded-xl bg-emerald-500/20 text-emerald-300 font-semibold">Submitted</span>
+                        ) : (
+                          <button
+                            onClick={() => handleSubmitAssignment(item.id)}
+                            className="bg-indigo-600 hover:bg-indigo-500 text-white px-3.5 py-1.5 rounded-xl text-xs font-semibold"
+                          >
+                            Upload Solution
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* NOTICES TAB */}
+              {activeTab === 'notices' && (
+                <div className="space-y-6">
+                  {(role === 'faculty' || role === 'admin') && (
+                    <form onSubmit={handleAddNotice} className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3">
+                      <h4 className="font-bold text-white text-sm">Broadcast Departmental Notice</h4>
+                      <div className="flex gap-3">
+                        <input
+                          type="text"
+                          value={newNoticeTitle}
+                          onChange={(e) => setNewNoticeTitle(e.target.value)}
+                          placeholder="Enter official announcement..."
+                          className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white"
+                        />
+                        <button type="submit" className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-semibold">
+                          Broadcast
+                        </button>
+                      </div>
+                    </form>
+                  )}
+
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3">
+                    <h3 className="font-bold text-white text-base">Digital Notice Board</h3>
+                    {notices.map((n) => (
+                      <div key={n.id} className="bg-slate-950 border border-slate-800 p-4 rounded-xl">
+                        <span className="text-[11px] px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 mr-2">{n.category}</span>
+                        <span className="text-sm font-semibold text-white">{n.title}</span>
+                        <p className="text-xs text-slate-400 mt-1">Posted by {n.author} • {n.date}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </main>
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>

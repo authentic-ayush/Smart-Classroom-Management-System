@@ -1,92 +1,480 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SCMS Portal — IET Lucknow</title>
+
+  <!-- Load Inter Font for modern, clean UI typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+          },
+        },
+      },
+    };
+  </script>
+
+  <!-- React 18, ReactDOM 18 & Babel Standalone CDNs -->
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
-<body class="bg-slate-950 text-slate-100 font-sans">
+<body class="bg-slate-950 text-slate-100 font-sans antialiased selection:bg-indigo-500/30 selection:text-indigo-200">
+  <!-- React Application Root -->
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useEffect } = React;
+    const { useState, useEffect, Component } = React;
 
+    /* =========================================================================
+     * ERROR BOUNDARY FOR GRACEFUL RUNTIME RECOVERY
+     * ========================================================================= */
+    class ErrorBoundary extends Component {
+      constructor(props) {
+        super(props);
+        this.state = { hasError: false, errorMessage: '' };
+      }
+
+      static getDerivedStateFromError(error) {
+        return {
+          hasError: true,
+          errorMessage: error?.message || 'An unexpected rendering error occurred.',
+        };
+      }
+
+      render() {
+        if (this.state.hasError) {
+          return (
+            <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
+              <div className="max-w-md w-full bg-slate-900 border border-rose-500/40 rounded-2xl p-6 text-center space-y-4">
+                <h2 className="text-lg font-bold text-rose-400">Something went wrong</h2>
+                <p className="text-sm text-slate-300">{this.state.errorMessage}</p>
+                <button
+                  onClick={() => this.setState({ hasError: false, errorMessage: '' })}
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-sm font-semibold"
+                >
+                  Reload Interface
+                </button>
+              </div>
+            </div>
+          );
+        }
+        return this.props.children;
+      }
+    }
+
+    /* =========================================================================
+     * AUTHENTICATION ACCOUNTS (STUDENT & FACULTY ONLY)
+     * ========================================================================= */
+    const USERS = [
+      {
+        id: '2500520100122',
+        password: '1234',
+        role: 'student',
+        name: 'Ayush',
+        subtitle: 'Roll No: 2500520100122 • B.Tech CSE 2nd Yr',
+      },
+      {
+        id: '2500520100105',
+        password: '1234',
+        role: 'student',
+        name: 'Abhishek Verma',
+        subtitle: 'Roll No: 2500520100105 • B.Tech CSE 2nd Yr',
+      },
+      {
+        id: '2500520100115',
+        password: '1234',
+        role: 'student',
+        name: 'Anurag Chaudhary',
+        subtitle: 'Roll No: 2500520100115 • B.Tech CSE 2nd Yr',
+      },
+      {
+        id: 'faculty@ietlucknow.ac.in',
+        password: 'faculty123',
+        role: 'faculty',
+        name: 'Prof. R. K. Sharma',
+        subtitle: 'Dept. of Computer Science & Engg.',
+      },
+    ];
+
+    /* =========================================================================
+     * INITIAL ACADEMIC DATA (IET LUCKNOW — B.TECH CSE 3RD SEMESTER)
+     * ========================================================================= */
     const INITIAL_SUBJECTS = [
       { code: 'BCS-301', name: 'Data Structures & Algorithms', attended: 28, total: 32, faculty: 'Prof. R. K. Sharma', room: 'LH-201' },
       { code: 'BCS-302', name: 'Computer Organization & Architecture', attended: 24, total: 28, faculty: 'Dr. S. Verma', room: 'LH-202' },
       { code: 'BCS-303', name: 'Discrete Structures & Theory of Logic', attended: 21, total: 26, faculty: 'Prof. A. Mishra', room: 'LH-201' },
       { code: 'BOE-310', name: 'Digital Electronics', attended: 19, total: 25, faculty: 'Dr. P. Singh', room: 'LH-104' },
-      { code: 'BVE-301', name: 'Universal Human Values & Ethics', attended: 16, total: 18, faculty: 'Prof. N. Gupta', room: 'Seminar Hall' }
+      { code: 'BVE-301', name: 'Universal Human Values & Ethics', attended: 16, total: 18, faculty: 'Prof. N. Gupta', room: 'Seminar Hall' },
     ];
 
     const INITIAL_TIMETABLE = [
-      { id: 1, time: '09:00 AM - 10:00 AM', code: 'BCS-301', subject: 'Data Structures & Algorithms', room: 'LH-201', status: 'Scheduled' },
-      { id: 2, time: '10:00 AM - 11:00 AM', code: 'BCS-302', subject: 'Computer Organization & Architecture', room: 'LH-202', status: 'Scheduled' },
-      { id: 3, time: '11:15 AM - 12:15 PM', code: 'BCS-303', subject: 'Discrete Structures & Theory of Logic', room: 'LH-201', status: 'Rescheduled to LH-204' },
-      { id: 4, time: '01:30 PM - 02:30 PM', code: 'BOE-310', subject: 'Digital Electronics', room: 'LH-104', status: 'Scheduled' },
-      { id: 5, time: '02:30 PM - 03:30 PM', code: 'BVE-301', subject: 'Universal Human Values & Ethics', room: 'Seminar Hall', status: 'Scheduled' }
+      { id: 1, time: '09:00 AM - 10:00 AM', code: 'BCS-301', subject: 'Data Structures & Algorithms', faculty: 'Prof. R. K. Sharma', room: 'LH-201', status: 'Scheduled' },
+      { id: 2, time: '10:00 AM - 11:00 AM', code: 'BCS-302', subject: 'Computer Organization & Architecture', faculty: 'Dr. S. Verma', room: 'LH-202', status: 'Scheduled' },
+      { id: 3, time: '11:15 AM - 12:15 PM', code: 'BCS-303', subject: 'Discrete Structures & Theory of Logic', faculty: 'Prof. A. Mishra', room: 'LH-201', status: 'Rescheduled to LH-204' },
+      { id: 4, time: '01:30 PM - 02:30 PM', code: 'BOE-310', subject: 'Digital Electronics', faculty: 'Dr. P. Singh', room: 'LH-104', status: 'Scheduled' },
+      { id: 5, time: '02:30 PM - 03:30 PM', code: 'BVE-301', subject: 'Universal Human Values & Ethics', faculty: 'Prof. N. Gupta', room: 'Seminar Hall', status: 'Scheduled' },
     ];
 
     const INITIAL_ASSIGNMENTS = [
       { id: 1, code: 'BCS-301', title: 'Implement Singly & Doubly Linked List Operations in C++', dueDate: '2026-11-25', submitted: true, grade: '19/20' },
       { id: 2, code: 'BCS-302', title: 'Design 4-bit Arithmetic Logic Unit (ALU) Combinational Circuit', dueDate: '2026-11-28', submitted: false, grade: 'Pending' },
-      { id: 3, code: 'BCS-303', title: 'Propositional Logic & Hasse Diagram Problem Set #3', dueDate: '2026-11-30', submitted: false, grade: 'Pending' }
+      { id: 3, code: 'BCS-303', title: 'Propositional Logic & Hasse Diagram Problem Set #3', dueDate: '2026-11-30', submitted: false, grade: 'Pending' },
     ];
 
     const INITIAL_NOTICES = [
       { id: 1, title: 'Mid-Semester Test-2 (CT-2) Schedule Released', category: 'Examination', date: 'Nov 18, 2026', author: 'COE Office' },
       { id: 2, title: 'Smart India Hackathon Internal Screening Round in Seminar Hall', category: 'Technical Event', date: 'Nov 16, 2026', author: 'CSE Department' },
-      { id: 3, title: 'Extra Lab Session for Data Structures (BCS-351) on Saturday', category: 'Academic', date: 'Nov 15, 2026', author: 'Prof. R. K. Sharma' }
+      { id: 3, title: 'Extra Lab Session for Data Structures (BCS-351) on Saturday', category: 'Academic', date: 'Nov 15, 2026', author: 'Prof. R. K. Sharma' },
     ];
 
+    /* =========================================================================
+     * CRISP INLINE SVG ICONS
+     * ========================================================================= */
+    const Icons = {
+      Cap: ({ className = 'w-7 h-7' }) => (
+        <svg className={className} fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 3L1 9l11 6 9-4.91V17M5 13.18v4L12 21l7-3.82v-4" />
+        </svg>
+      ),
+      Dashboard: () => (
+        <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="3" y="3" width="7" height="9" rx="1.5" />
+          <rect x="14" y="3" width="7" height="5" rx="1.5" />
+          <rect x="14" y="12" width="7" height="9" rx="1.5" />
+          <rect x="3" y="16" width="7" height="5" rx="1.5" />
+        </svg>
+      ),
+      Qr: () => (
+        <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h6v6H3V3zm12 0h6v6h-6V3zM3 15h6v6H3v-6zm12 0h2v2h-2v-2zm4 0h2v2h-2v-2zm-4 4h2v2h-2v-2zm4 0h2v2h-2v-2z" />
+        </svg>
+      ),
+      Calendar: () => (
+        <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="3" y="4" width="18" height="18" rx="2" />
+          <path strokeLinecap="round" d="M16 2v4M8 2v4M3 10h18" />
+        </svg>
+      ),
+      Book: () => (
+        <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4 19.5A2.5 2.5 0 016.5 17H20M4 19.5V5a2 2 0 012-2h14v18H6.5A2.5 2.5 0 014 19.5z" />
+        </svg>
+      ),
+      Bell: () => (
+        <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+        </svg>
+      ),
+      Logout: () => (
+        <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+        </svg>
+      ),
+      Check: () => (
+        <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
+      ),
+      Eye: () => (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.9" viewBox="0 0 24 24" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+        </svg>
+      ),
+      EyeOff: () => (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.9" viewBox="0 0 24 24" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+        </svg>
+      ),
+    };
+
+    /* =========================================================================
+     * DETERMINISTIC SVG QR GRAPHIC FOR FACULTY LIVE ATTENDANCE CONTROLLER
+     * ========================================================================= */
+    function SessionQrGraphic({ code }) {
+      const seed = parseInt(code, 10) || 4829;
+      const cells = [];
+
+      for (let r = 0; r < 7; r++) {
+        for (let c = 0; c < 7; c++) {
+          const isTopLeft = r < 2 && c < 2;
+          const isTopRight = r < 2 && c > 4;
+          const isBottomLeft = r > 4 && c < 2;
+          const isActive =
+            isTopLeft || isTopRight || isBottomLeft || (seed * (r + 3) + c * 17) % 3 !== 0;
+
+          if (isActive) {
+            cells.push(
+              <rect
+                key={`${r}-${c}`}
+                x={c * 10 + 5}
+                y={r * 10 + 5}
+                width="8"
+                height="8"
+                rx="1.5"
+                fill="currentColor"
+              />
+            );
+          }
+        }
+      }
+
+      return (
+        <div className="inline-flex p-2.5 bg-white text-slate-950 rounded-xl shadow-inner border border-slate-300">
+          <svg width="78" height="78" viewBox="0 0 80 80" aria-label={`QR Code for OTP ${code}`}>
+            {cells}
+          </svg>
+        </div>
+      );
+    }
+
+    /* =========================================================================
+     * MINIMAL LOGIN PAGE COMPONENT (STUDENT & FACULTY ONLY)
+     * ========================================================================= */
+    function LoginPage({ onLogin }) {
+      const [selectedRole, setSelectedRole] = useState('student');
+      const [userId, setUserId] = useState('');
+      const [password, setPassword] = useState('');
+      const [showPassword, setShowPassword] = useState(false);
+      const [error, setError] = useState('');
+
+      // Validate credentials against Student and Faculty accounts
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        try {
+          const found = USERS.find(
+            (u) =>
+              u.id.toLowerCase() === userId.trim().toLowerCase() &&
+              u.password === password &&
+              u.role === selectedRole
+          );
+
+          if (!found) {
+            setError(
+              selectedRole === 'student'
+                ? 'Invalid University Roll Number or Password. Please try again.'
+                : 'Invalid Official Email ID or Password. Please try again.'
+            );
+            return;
+          }
+
+          setError('');
+          onLogin(found);
+        } catch (err) {
+          setError('Unable to complete sign-in. Please try again.');
+        }
+      };
+
+      return (
+        <div className="min-h-screen w-full flex items-center justify-center p-4 sm:p-6 bg-[#070b1a] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-950/60 via-[#070b1a] to-[#050814]">
+          <div className="w-full max-w-md bg-[#0d1226]/95 backdrop-blur-xl border border-slate-800/90 rounded-2xl shadow-2xl shadow-black/60 p-7 sm:p-8 space-y-6">
+            {/* 1, 2, 3: Top Icon Box, Title & Muted Subtitle */}
+            <div className="text-center space-y-3">
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-500/15 border border-indigo-500/35 text-indigo-400 shadow-lg shadow-indigo-500/10">
+                <Icons.Cap className="w-7 h-7" />
+              </div>
+              <div className="space-y-1">
+                <h1 className="text-2xl font-extrabold text-white tracking-tight">
+                  SCMS Portal Login
+                </h1>
+                <p className="text-xs text-slate-400">
+                  Smart Class Management System • IET Lucknow (B.Tech CSE)
+                </p>
+              </div>
+            </div>
+
+            {/* 4: 2-Column Segmented Role Toggle (Student / Faculty ONLY) */}
+            <div className="grid grid-cols-2 gap-1.5 bg-[#060917] p-1.5 rounded-xl border border-slate-800/90">
+              {[
+                { id: 'student', label: 'Student' },
+                { id: 'faculty', label: 'Faculty' },
+              ].map((r) => (
+                <button
+                  key={r.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedRole(r.id);
+                    setError('');
+                  }}
+                  className={`py-2.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
+                    selectedRole === r.id
+                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/40'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/70'
+                  }`}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Inline Error Banner (rendered only on invalid login) */}
+            {error && (
+              <div
+                role="alert"
+                className="bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs px-4 py-3 rounded-xl leading-relaxed"
+              >
+                {error}
+              </div>
+            )}
+
+            {/* 5, 6, 7: Login Form & Vibrant Submit Button */}
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label
+                  htmlFor="scms-user-id"
+                  className="block text-xs font-semibold text-slate-200 mb-1.5"
+                >
+                  {selectedRole === 'student' ? 'University Roll Number' : 'Official Email ID'}
+                </label>
+                <input
+                  id="scms-user-id"
+                  type="text"
+                  required
+                  value={userId}
+                  onChange={(e) => setUserId(e.target.value)}
+                  placeholder={
+                    selectedRole === 'student'
+                      ? 'e.g. 2500520100122'
+                      : 'faculty@ietlucknow.ac.in'
+                  }
+                  className="w-full bg-[#060917] border border-slate-700/80 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 transition-all"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="scms-password"
+                  className="block text-xs font-semibold text-slate-200 mb-1.5"
+                >
+                  Password
+                </label>
+                <div className="relative">
+                  <input
+                    id="scms-password"
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter your password"
+                    className="w-full bg-[#060917] border border-slate-700/80 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none rounded-xl pl-4 pr-11 py-3 text-sm text-white placeholder-slate-500 transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 p-1.5 rounded-lg transition-colors"
+                  >
+                    {showPassword ? <Icons.EyeOff /> : <Icons.Eye />}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full bg-indigo-600 hover:bg-indigo-500 active:scale-[0.99] text-white font-semibold py-3 rounded-xl text-sm transition-all shadow-lg shadow-indigo-600/35 mt-2"
+              >
+                {selectedRole === 'student'
+                  ? 'Sign In to Student Portal'
+                  : 'Sign In to Faculty Portal'}
+              </button>
+            </form>
+          </div>
+        </div>
+      );
+    }
+
+    /* =========================================================================
+     * MAIN SCMS PORTAL APPLICATION (STUDENT & FACULTY DASHBOARD)
+     * ========================================================================= */
     function App() {
-      const [role, setRole] = useState('student');
+      const [currentUser, setCurrentUser] = useState(null);
       const [activeTab, setActiveTab] = useState('dashboard');
       const [subjects, setSubjects] = useState(INITIAL_SUBJECTS);
       const [timetable] = useState(INITIAL_TIMETABLE);
       const [assignments, setAssignments] = useState(INITIAL_ASSIGNMENTS);
       const [notices, setNotices] = useState(INITIAL_NOTICES);
 
+      // Active Smart Classroom OTP/QR session state
       const [activeSession, setActiveSession] = useState({
         active: true,
         courseCode: 'BCS-301',
         otp: '4829',
         expiresIn: 120,
-        markedByAyush: false
+        markedStudents: [],
       });
 
+      // Interactive input and feedback states
       const [studentOtpInput, setStudentOtpInput] = useState('');
-      const [toastMessage, setToastMessage] = useState('');
+      const [toast, setToast] = useState(null);
       const [selectedCourseForOtp, setSelectedCourseForOtp] = useState('BCS-301');
       const [newNoticeTitle, setNewNoticeTitle] = useState('');
+      const [newNoticeCategory, setNewNoticeCategory] = useState('Academic');
       const [newAssignmentTitle, setNewAssignmentTitle] = useState('');
       const [newAssignmentCourse, setNewAssignmentCourse] = useState('BCS-301');
 
-      const triggerToast = (msg) => {
-        setToastMessage(msg);
-        setTimeout(() => setToastMessage(''), 3500);
+      // Show toast notification banner (never uses browser alert())
+      const triggerToast = (message, tone = 'indigo') => {
+        setToast({ message, tone });
       };
 
+      // Auto-dismiss toast after 3.5 seconds
+      useEffect(() => {
+        if (!toast) return;
+        const timer = setTimeout(() => setToast(null), 3500);
+        return () => clearTimeout(timer);
+      }, [toast]);
+
+      // Live 120-second countdown timer for the active attendance session
       useEffect(() => {
         if (!activeSession.active) return;
-        const timer = setInterval(() => {
+        const interval = setInterval(() => {
           setActiveSession((prev) => {
-            if (prev.expiresIn <= 1) return { ...prev, active: false, expiresIn: 0 };
+            if (prev.expiresIn <= 1) {
+              return { ...prev, active: false, expiresIn: 0 };
+            }
             return { ...prev, expiresIn: prev.expiresIn - 1 };
           });
         }, 1000);
-        return () => clearInterval(timer);
+        return () => clearInterval(interval);
       }, [activeSession.active]);
 
+      // Render minimal Login Page if unauthenticated
+      if (!currentUser) {
+        return (
+          <LoginPage
+            onLogin={(user) => {
+              setCurrentUser(user);
+              setActiveTab('dashboard');
+              triggerToast(`Welcome back, ${user.name}!`, 'emerald');
+            }}
+          />
+        );
+      }
+
+      // Derived dashboard metrics
+      const role = currentUser.role;
+      const isMarkedByCurrentUser = activeSession.markedStudents.some(
+        (s) => s.id === currentUser.id
+      );
       const totalAttended = subjects.reduce((acc, s) => acc + s.attended, 0);
       const totalClasses = subjects.reduce((acc, s) => acc + s.total, 0);
-      const overallPercentage = ((totalAttended / totalClasses) * 100).toFixed(1);
+      const overallPercentage =
+        totalClasses > 0 ? ((totalAttended / totalClasses) * 100).toFixed(1) : '0.0';
+      const pendingAssignmentsCount = assignments.filter((a) => !a.submitted).length;
       const latestNotice = notices[0];
 
+      // Faculty: Generate fresh random 4-digit OTP and restart 120s window
       const handleGenerateOtp = () => {
         const randomOtp = Math.floor(1000 + Math.random() * 9000).toString();
         setActiveSession({
@@ -94,17 +482,32 @@
           courseCode: selectedCourseForOtp,
           otp: randomOtp,
           expiresIn: 120,
-          markedByAyush: false
+          markedStudents: [],
         });
-        triggerToast(`Live OTP ${randomOtp} generated for ${selectedCourseForOtp}!`);
+        triggerToast(
+          `Live OTP ${randomOtp} generated for ${selectedCourseForOtp} (120s window)!`,
+          'emerald'
+        );
       };
 
+      // Student: Verify presence using 4-digit OTP or simulated QR check-in
       const handleMarkAttendance = (mode = 'otp') => {
-        if (!activeSession.active) return triggerToast('No active attendance session running.');
-        if (activeSession.markedByAyush) return triggerToast('Attendance already marked!');
-        if (mode === 'otp' && studentOtpInput.trim() !== activeSession.otp) {
-          return triggerToast('Invalid OTP! Check the faculty session code.');
+        if (!activeSession.active) {
+          return triggerToast(
+            'Attendance window has expired. Wait for faculty to open a new session.',
+            'rose'
+          );
         }
+        if (isMarkedByCurrentUser) {
+          return triggerToast('Your attendance is already recorded for this session.', 'indigo');
+        }
+        if (mode === 'otp' && studentOtpInput.trim() !== activeSession.otp) {
+          return triggerToast(
+            `Invalid OTP! Enter the live 4-digit code displayed by faculty (${activeSession.otp}).`,
+            'rose'
+          );
+        }
+
         setSubjects((prev) =>
           prev.map((sub) =>
             sub.code === activeSession.courseCode
@@ -112,310 +515,631 @@
               : sub
           )
         );
-        setActiveSession((prev) => ({ ...prev, markedByAyush: true }));
+
+        const timestamp = new Date().toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        });
+
+        setActiveSession((prev) => ({
+          ...prev,
+          markedStudents: [
+            ...prev.markedStudents,
+            {
+              id: currentUser.id,
+              name: currentUser.name,
+              mode: mode.toUpperCase(),
+              time: timestamp,
+            },
+          ],
+        }));
+
         setStudentOtpInput('');
-        triggerToast(`Attendance verified for Ayush (2500520100122) in ${activeSession.courseCode}!`);
+        triggerToast(
+          `Attendance verified (${mode.toUpperCase()}) for ${currentUser.name} (${currentUser.id}) in ${activeSession.courseCode}!`,
+          'emerald'
+        );
       };
 
+      // Student: Upload solution for a pending coursework task
       const handleSubmitAssignment = (id) => {
         setAssignments((prev) =>
-          prev.map((a) => (a.id === id ? { ...a, submitted: true, grade: 'Submitted (Under Review)' } : a))
+          prev.map((a) =>
+            a.id === id ? { ...a, submitted: true, grade: 'Submitted (Under Review)' } : a
+          )
         );
-        triggerToast('Assignment uploaded successfully by Ayush!');
+        triggerToast(`Assignment solution uploaded successfully by ${currentUser.name}!`, 'emerald');
       };
 
-      const handleAddNotice = (e) => {
-        e.preventDefault();
-        if (!newNoticeTitle.trim()) return;
-        setNotices([
-          {
-            id: Date.now(),
-            title: newNoticeTitle,
-            category: 'Academic',
-            date: 'Just Now',
-            author: role === 'faculty' ? 'Prof. R. K. Sharma' : 'System Admin'
-          },
-          ...notices
-        ]);
-        setNewNoticeTitle('');
-        triggerToast('Notice broadcasted to all students!');
-      };
-
+      // Faculty: Publish a new coursework assignment
       const handleCreateAssignment = (e) => {
         e.preventDefault();
         if (!newAssignmentTitle.trim()) return;
-        setAssignments([
+        setAssignments((prev) => [
           {
             id: Date.now(),
             code: newAssignmentCourse,
-            title: newAssignmentTitle,
+            title: newAssignmentTitle.trim(),
             dueDate: '2026-12-01',
             submitted: false,
-            grade: 'Pending'
+            grade: 'Pending',
           },
-          ...assignments
+          ...prev,
         ]);
         setNewAssignmentTitle('');
-        triggerToast(`New assignment posted for ${newAssignmentCourse}!`);
+        triggerToast(`New coursework assignment published for ${newAssignmentCourse}!`, 'emerald');
+      };
+
+      // Faculty: Broadcast an official notice to all students
+      const handleAddNotice = (e) => {
+        e.preventDefault();
+        if (!newNoticeTitle.trim()) return;
+        setNotices((prev) => [
+          {
+            id: Date.now(),
+            title: newNoticeTitle.trim(),
+            category: newNoticeCategory,
+            date: 'Just Now',
+            author: currentUser.name,
+          },
+          ...prev,
+        ]);
+        setNewNoticeTitle('');
+        triggerToast('Official notice broadcasted to all student portals!', 'indigo');
+      };
+
+      const navItems = [
+        { id: 'dashboard', label: 'Dashboard Overview', icon: <Icons.Dashboard /> },
+        { id: 'attendance', label: 'Smart Attendance', icon: <Icons.Qr /> },
+        { id: 'timetable', label: 'Live Timetable', icon: <Icons.Calendar /> },
+        { id: 'assignments', label: 'Assignments & Labs', icon: <Icons.Book /> },
+        { id: 'notices', label: 'Digital Notice Board', icon: <Icons.Bell /> },
+      ];
+
+      const roleBadgeColors = {
+        student: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
+        faculty: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
       };
 
       return (
-        <div className="min-h-screen flex flex-col">
-          {toastMessage && (
-            <div className="fixed bottom-5 right-5 z-50 bg-indigo-600 text-white px-4 py-3 rounded-xl shadow-2xl border border-indigo-400">
-              <span className="text-sm font-medium">✨ {toastMessage}</span>
+        <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100">
+          {/* Bottom-Right Interactive Toast Notification */}
+          {toast && (
+            <div
+              role="status"
+              className={`fixed bottom-5 right-5 z-50 max-w-sm px-4 py-3 rounded-xl shadow-2xl border flex items-center gap-2.5 text-sm font-medium transition-all ${
+                toast.tone === 'rose'
+                  ? 'bg-rose-600 border-rose-400 text-white'
+                  : toast.tone === 'emerald'
+                  ? 'bg-emerald-600 border-emerald-400 text-white'
+                  : 'bg-indigo-600 border-indigo-400 text-white'
+              }`}
+            >
+              <Icons.Check />
+              <span>{toast.message}</span>
             </div>
           )}
 
-          {/* Top Bar */}
-          <header className="bg-slate-900 border-b border-slate-800 sticky top-0 z-40 px-6 py-3.5 flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="font-bold text-lg text-white">SCMS Portal</h1>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                  IET Lucknow • CSE
-                </span>
+          {/* Top Navigation Header */}
+          <header className="bg-slate-900/95 backdrop-blur-md border-b border-slate-800 sticky top-0 z-40 px-4 sm:px-6 py-3.5">
+            <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+              {/* Portal Brand */}
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-600/20 border border-indigo-500/40 text-indigo-400 flex items-center justify-center shrink-0">
+                  <Icons.Cap className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h1 className="font-bold text-base sm:text-lg text-white leading-tight">
+                      SCMS Portal
+                    </h1>
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                      IET Lucknow • CSE
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 hidden sm:block">
+                    Smart Class Management System — B.Tech CSE 2nd Year
+                  </p>
+                </div>
               </div>
-              <p className="text-xs text-slate-400">Smart Class Management System — Mini Project</p>
-            </div>
 
-            <div className="flex items-center gap-2 bg-slate-800 p-1 rounded-xl border border-slate-700">
-              <button
-                onClick={() => setRole('student')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${role === 'student' ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}
-              >
-                Student View (Ayush)
-              </button>
-              <button
-                onClick={() => setRole('faculty')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${role === 'faculty' ? 'bg-emerald-600 text-white' : 'text-slate-400'}`}
-              >
-                Faculty View
-              </button>
-              <button
-                onClick={() => setRole('admin')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${role === 'admin' ? 'bg-amber-600 text-white' : 'text-slate-400'}`}
-              >
-                Admin Console
-              </button>
-            </div>
+              {/* Active User Info Badge & Logout Action */}
+              <div className="flex items-center gap-2.5 sm:gap-3 ml-auto">
+                <div className="text-right bg-slate-800/60 px-3 py-1.5 rounded-xl border border-slate-700/80">
+                  <div className="flex items-center justify-end gap-1.5">
+                    <p className="text-xs font-semibold text-white">{currentUser.name}</p>
+                    <span
+                      className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-md border ${roleBadgeColors[role]}`}
+                    >
+                      {role}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 hidden sm:block mt-0.5">
+                    {currentUser.subtitle}
+                  </p>
+                </div>
 
-            <div className="hidden md:block text-right bg-slate-800/50 px-3.5 py-1.5 rounded-xl border border-slate-800">
-              <p className="text-xs font-semibold text-white">
-                {role === 'student' ? 'Ayush' : role === 'faculty' ? 'Prof. R. K. Sharma' : 'System Administrator'}
-              </p>
-              <p className="text-[11px] text-slate-400">
-                {role === 'student' ? 'Roll No: 2500520100122 • B.Tech CSE 2nd Yr' : 'Dept. of Computer Science & Engg.'}
-              </p>
+                <button
+                  onClick={() => {
+                    setCurrentUser(null);
+                    setStudentOtpInput('');
+                  }}
+                  className="inline-flex items-center gap-1.5 bg-rose-500/15 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all"
+                >
+                  <Icons.Logout />
+                  <span>Logout</span>
+                </button>
+              </div>
             </div>
           </header>
 
-          {/* Main Layout */}
-          <div className="flex-1 flex flex-col md:flex-row max-w-7xl w-full mx-auto p-4 md:p-6 gap-6">
-            <aside className="w-full md:w-60 shrink-0">
-              <nav className="bg-slate-900 border border-slate-800 rounded-2xl p-3 space-y-1.5">
-                {[
-                  { id: 'dashboard', label: '📊 Dashboard Overview' },
-                  { id: 'attendance', label: '📱 Smart Attendance' },
-                  { id: 'timetable', label: '📅 Live Timetable' },
-                  { id: 'assignments', label: '📚 Assignments & Labs' },
-                  { id: 'notices', label: '🔔 Digital Notice Board' }
-                ].map((item) => (
+          {/* Main Dashboard Layout */}
+          <div className="flex-1 flex flex-col lg:flex-row max-w-7xl w-full mx-auto p-4 sm:p-6 gap-6">
+            {/* Left Sidebar Navigation (5 Tabs) */}
+            <aside className="w-full lg:w-64 shrink-0">
+              <nav className="bg-slate-900 border border-slate-800 rounded-2xl p-2.5 flex lg:flex-col gap-1.5 overflow-x-auto lg:overflow-visible">
+                {navItems.map((item) => (
                   <button
                     key={item.id}
                     onClick={() => setActiveTab(item.id)}
-                    className={`w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                      activeTab === item.id ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-slate-800'
+                    className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-medium whitespace-nowrap transition-all shrink-0 lg:w-full text-left ${
+                      activeTab === item.id
+                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+                        : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
                     }`}
                   >
-                    {item.label}
+                    {item.icon}
+                    <span>{item.label}</span>
                   </button>
                 ))}
               </nav>
             </aside>
 
-            <main className="flex-1 space-y-6">
-              {/* Summary Row */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Primary Content Area */}
+            <main className="flex-1 min-w-0 space-y-6">
+              {/* Top 4 KPI Summary Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
                 <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
-                  <p className="text-xs text-slate-400">Overall Attendance</p>
-                  <p className="text-2xl font-bold text-white mt-1">{overallPercentage}%</p>
-                  <p className="text-xs text-emerald-400 mt-1">{totalAttended}/{totalClasses} Lectures (Safe &gt;75%)</p>
-                </div>
-
-                <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
-                  <p className="text-xs text-slate-400">Live OTP Session</p>
-                  <p className="text-2xl font-bold text-white mt-1">{activeSession.active ? activeSession.courseCode : 'Idle'}</p>
-                  <p className="text-xs text-indigo-400 mt-1">
-                    {activeSession.active ? `OTP: ${activeSession.otp} (${activeSession.expiresIn}s)` : 'Waiting for Faculty'}
+                  <p className="text-xs font-medium text-slate-400">Overall Attendance</p>
+                  <p className="text-2xl font-extrabold text-white mt-1">{overallPercentage}%</p>
+                  <p
+                    className={`text-xs mt-1 font-medium ${
+                      Number(overallPercentage) >= 75 ? 'text-emerald-400' : 'text-amber-400'
+                    }`}
+                  >
+                    {totalAttended}/{totalClasses} Lectures (
+                    {Number(overallPercentage) >= 75 ? 'Safe >75%' : 'Below 75%'})
                   </p>
                 </div>
 
                 <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
-                  <p className="text-xs text-slate-400">Pending Coursework</p>
-                  <p className="text-2xl font-bold text-white mt-1">{assignments.filter(a => !a.submitted).length} Tasks</p>
-                  <p className="text-xs text-slate-400 mt-1">B.Tech CSE 3rd Sem</p>
+                  <p className="text-xs font-medium text-slate-400">Live OTP Session</p>
+                  <p className="text-2xl font-extrabold text-white mt-1">
+                    {activeSession.active ? activeSession.courseCode : 'Expired'}
+                  </p>
+                  <p className="text-xs text-indigo-400 mt-1 font-medium">
+                    {activeSession.active
+                      ? `OTP: ${activeSession.otp} • ${activeSession.expiresIn}s left`
+                      : 'Waiting for Faculty'}
+                  </p>
+                </div>
+
+                <div
+                  onClick={() => setActiveTab('assignments')}
+                  className="bg-slate-900 border border-slate-800 hover:border-indigo-500/60 p-4 rounded-2xl cursor-pointer transition-colors"
+                >
+                  <p className="text-xs font-medium text-slate-400">Pending Coursework</p>
+                  <p className="text-2xl font-extrabold text-white mt-1">
+                    {pendingAssignmentsCount} {pendingAssignmentsCount === 1 ? 'Task' : 'Tasks'}
+                  </p>
+                  <p className="text-xs text-slate-400 mt-1">B.Tech CSE 3rd Semester</p>
                 </div>
 
                 <div
                   onClick={() => setActiveTab('notices')}
-                  className="bg-slate-900 border border-slate-800 hover:border-indigo-500 p-4 rounded-2xl cursor-pointer"
+                  className="bg-slate-900 border border-slate-800 hover:border-indigo-500/60 p-4 rounded-2xl cursor-pointer transition-colors"
                 >
-                  <p className="text-xs text-rose-400 font-semibold">🔔 Latest Notice</p>
-                  <p className="text-sm font-bold text-white truncate mt-1">{latestNotice.title}</p>
-                  <p className="text-[11px] text-slate-400 mt-2">{latestNotice.category} • {latestNotice.date}</p>
+                  <div className="flex items-center gap-1.5 text-xs text-rose-400 font-semibold">
+                    <Icons.Bell />
+                    <span>Latest Notice</span>
+                  </div>
+                  <p className="text-sm font-bold text-white truncate mt-1.5">
+                    {latestNotice.title}
+                  </p>
+                  <p className="text-[11px] text-slate-400 mt-1.5">
+                    {latestNotice.category} • {latestNotice.date}
+                  </p>
                 </div>
               </div>
 
-              {/* DASHBOARD TAB */}
+              {/* ===============================================================
+               * TAB 1: DASHBOARD OVERVIEW
+               * =============================================================== */}
               {activeTab === 'dashboard' && (
                 <div className="space-y-6">
-                  <div className="bg-gradient-to-r from-indigo-900/60 to-slate-900 border border-indigo-500/30 rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4">
-                    <div>
-                      <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                        ● Active Smart Classroom Session
+                  {/* Active Smart Classroom Session Banner */}
+                  <div className="bg-gradient-to-r from-indigo-950/90 via-slate-900 to-slate-900 border border-indigo-500/30 rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="space-y-1.5">
+                      <span
+                        className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${
+                          activeSession.active
+                            ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                            : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                        }`}
+                      >
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            activeSession.active ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
+                          }`}
+                        />
+                        {activeSession.active
+                          ? 'Active Smart Classroom Session'
+                          : 'Session Window Closed'}
                       </span>
-                      <h2 className="text-lg font-bold text-white mt-2">
-                        {activeSession.active ? `${activeSession.courseCode}: Attendance Window Open` : 'No Active Session'}
+                      <h2 className="text-lg font-bold text-white">
+                        {activeSession.active
+                          ? `${activeSession.courseCode}: Attendance Window Open (${activeSession.expiresIn}s)`
+                          : 'No Active Attendance Session'}
                       </h2>
-                      <p className="text-xs text-slate-300 mt-1">
-                        Enter the 4-digit OTP displayed on the projector screen or simulate a QR scan.
+                      <p className="text-xs text-slate-300">
+                        {role === 'student'
+                          ? 'Enter the live 4-digit OTP displayed on the projector screen or simulate a QR scan.'
+                          : 'Generate new OTP/QR sessions and monitor live verified student check-ins.'}
                       </p>
                     </div>
 
-                    {role === 'student' && activeSession.active && !activeSession.markedByAyush && (
-                      <div className="flex items-center gap-2">
+                    {/* Student Check-In Controls */}
+                    {role === 'student' && activeSession.active && !isMarkedByCurrentUser && (
+                      <div className="flex flex-wrap items-center gap-2">
                         <input
                           type="text"
                           maxLength={4}
                           value={studentOtpInput}
                           onChange={(e) => setStudentOtpInput(e.target.value)}
                           placeholder={`OTP (${activeSession.otp})`}
-                          className="bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white w-36"
+                          className="bg-slate-950 border border-slate-700 focus:border-indigo-500 focus:outline-none rounded-xl px-3.5 py-2.5 text-sm text-white w-32 font-mono tracking-widest"
                         />
                         <button
                           onClick={() => handleMarkAttendance('otp')}
-                          className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-xs font-semibold"
+                          className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-xl text-xs font-semibold transition-colors"
                         >
                           Verify OTP
                         </button>
                         <button
                           onClick={() => handleMarkAttendance('qr')}
-                          className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-xl text-xs font-semibold border border-slate-700"
+                          className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3.5 py-2.5 rounded-xl text-xs font-semibold border border-slate-700 transition-colors"
                         >
                           Simulate QR
                         </button>
                       </div>
                     )}
 
-                    {activeSession.markedByAyush && (
-                      <div className="text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-4 py-2 rounded-xl text-xs font-semibold">
-                        ✓ Present Marked for Ayush (2500520100122)
+                    {/* Student Present Marked Confirmation Badge */}
+                    {role === 'student' && isMarkedByCurrentUser && (
+                      <div className="inline-flex items-center gap-2 text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-4 py-2.5 rounded-xl text-xs font-semibold">
+                        <Icons.Check />
+                        <span>
+                          Present Marked for {currentUser.name} ({currentUser.id})
+                        </span>
                       </div>
+                    )}
+
+                    {/* Faculty Quick Action */}
+                    {role === 'faculty' && (
+                      <button
+                        onClick={() => setActiveTab('attendance')}
+                        className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 rounded-xl text-xs font-semibold transition-colors shrink-0"
+                      >
+                        Open OTP / QR Controller
+                      </button>
                     )}
                   </div>
 
+                  {/* Subject-Wise Attendance Analytics */}
                   <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
-                    <div>
-                      <h3 className="font-bold text-white text-base">Subject-Wise Attendance Analytics</h3>
-                      <p className="text-xs text-slate-400">Student: Ayush • Roll No: 2500520100122</p>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <h3 className="font-bold text-white text-base">
+                          Subject-Wise Attendance Analytics
+                        </h3>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          Active Profile: {currentUser.name} • {currentUser.subtitle}
+                        </p>
+                      </div>
+                      <span className="text-[11px] font-medium px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-slate-300">
+                        Minimum Criteria: 75%
+                      </span>
                     </div>
-                    {subjects.map((sub) => {
-                      const pct = Math.round((sub.attended / sub.total) * 100);
-                      return (
-                        <div key={sub.code} className="bg-slate-950 border border-slate-800 p-3.5 rounded-xl">
-                          <div className="flex justify-between mb-2">
-                            <div>
-                              <span className="text-xs font-bold text-indigo-400 mr-2">{sub.code}</span>
-                              <span className="text-sm font-semibold text-white">{sub.name}</span>
-                              <p className="text-xs text-slate-400">{sub.faculty} • Room: {sub.room}</p>
+
+                    <div className="space-y-3">
+                      {subjects.map((sub) => {
+                        const pct = Math.round((sub.attended / sub.total) * 100);
+                        return (
+                          <div
+                            key={sub.code}
+                            className="bg-slate-950 border border-slate-800/90 p-4 rounded-xl space-y-2.5"
+                          >
+                            <div className="flex flex-wrap justify-between items-start gap-2">
+                              <div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-xs font-bold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20">
+                                    {sub.code}
+                                  </span>
+                                  <span className="text-sm font-semibold text-white">
+                                    {sub.name}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-slate-400 mt-1">
+                                  {sub.faculty} • Room: {sub.room}
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <span
+                                  className={`text-sm font-bold ${
+                                    pct >= 75 ? 'text-emerald-400' : 'text-amber-400'
+                                  }`}
+                                >
+                                  {pct}%
+                                </span>
+                                <p className="text-xs text-slate-400">
+                                  {sub.attended}/{sub.total} lectures
+                                </p>
+                              </div>
                             </div>
-                            <div className="text-right">
-                              <span className="text-sm font-bold text-white">{pct}%</span>
-                              <p className="text-xs text-slate-400">{sub.attended}/{sub.total} lectures</p>
+                            <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all duration-500 ${
+                                  pct >= 75 ? 'bg-emerald-500' : 'bg-amber-500'
+                                }`}
+                                style={{ width: `${pct}%` }}
+                              />
                             </div>
                           </div>
-                          <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
-                            <div className={`h-full ${pct >= 75 ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ width: `${pct}%` }} />
-                          </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               )}
 
-              {/* ATTENDANCE TAB */}
+              {/* ===============================================================
+               * TAB 2: SMART ATTENDANCE
+               * =============================================================== */}
               {activeTab === 'attendance' && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
-                    <h3 className="font-bold text-white text-base">Faculty OTP / QR Session Controller</h3>
-                    <select
-                      value={selectedCourseForOtp}
-                      onChange={(e) => setSelectedCourseForOtp(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white"
-                    >
-                      {subjects.map((s) => (
-                        <option key={s.code} value={s.code}>{s.code} — {s.name}</option>
-                      ))}
-                    </select>
-                    <button
-                      onClick={handleGenerateOtp}
-                      className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2.5 rounded-xl text-sm"
-                    >
-                      Generate New Live OTP & QR Session
-                    </button>
-                    {activeSession.active && (
-                      <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 text-center">
-                        <p className="text-xs text-slate-400">Active Session Code for {activeSession.courseCode}</p>
-                        <p className="text-4xl font-extrabold tracking-widest text-indigo-400 my-1">{activeSession.otp}</p>
-                        <p className="text-xs text-amber-400">Expires in {activeSession.expiresIn} seconds</p>
-                      </div>
-                    )}
-                  </div>
+                  {/* Faculty OTP / QR Session Controller */}
+                  {role === 'faculty' && (
+                    <>
+                      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+                        <div>
+                          <h3 className="font-bold text-white text-base">
+                            Faculty OTP / QR Session Controller
+                          </h3>
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            Generate a time-bound 4-digit OTP and QR code to prevent proxy attendance.
+                          </p>
+                        </div>
 
-                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
-                    <h3 className="font-bold text-white text-base">Student Check-In Terminal (Ayush)</h3>
-                    <p className="text-xs text-slate-400">Roll No: 2500520100122</p>
-                    <input
-                      type="text"
-                      maxLength={4}
-                      value={studentOtpInput}
-                      onChange={(e) => setStudentOtpInput(e.target.value)}
-                      placeholder={`Enter 4-digit OTP (Try ${activeSession.otp})`}
-                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white"
-                    />
-                    <div className="flex gap-3">
-                      <button
-                        onClick={() => handleMarkAttendance('otp')}
-                        className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-2.5 rounded-xl text-xs font-semibold"
-                      >
-                        Submit OTP
-                      </button>
-                      <button
-                        onClick={() => handleMarkAttendance('qr')}
-                        className="flex-1 bg-slate-800 hover:bg-slate-700 text-white py-2.5 rounded-xl text-xs font-semibold border border-slate-700"
-                      >
-                        Scan Classroom QR
-                      </button>
+                        <div>
+                          <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                            Select Course
+                          </label>
+                          <select
+                            value={selectedCourseForOtp}
+                            onChange={(e) => setSelectedCourseForOtp(e.target.value)}
+                            className="w-full bg-slate-950 border border-slate-700 focus:border-indigo-500 focus:outline-none rounded-xl px-3.5 py-2.5 text-sm text-white"
+                          >
+                            {subjects.map((s) => (
+                              <option key={s.code} value={s.code}>
+                                {s.code} — {s.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <button
+                          onClick={handleGenerateOtp}
+                          className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 rounded-xl text-sm transition-colors shadow-lg shadow-emerald-600/20"
+                        >
+                          Generate New Live OTP & QR Session
+                        </button>
+
+                        <div className="bg-slate-950 border border-slate-800 rounded-2xl p-5 flex flex-col sm:flex-row items-center justify-around gap-4 text-center">
+                          <div>
+                            <p className="text-xs text-slate-400">
+                              Active Code for {activeSession.courseCode}
+                            </p>
+                            <p className="text-4xl font-extrabold tracking-[0.25em] text-indigo-400 my-2 font-mono">
+                              {activeSession.active ? activeSession.otp : '----'}
+                            </p>
+                            <p
+                              className={`text-xs font-semibold ${
+                                activeSession.active ? 'text-amber-400' : 'text-rose-400'
+                              }`}
+                            >
+                              {activeSession.active
+                                ? `Expires in ${activeSession.expiresIn} seconds`
+                                : 'Session Expired'}
+                            </p>
+                          </div>
+                          {activeSession.active && <SessionQrGraphic code={activeSession.otp} />}
+                        </div>
+                      </div>
+
+                      {/* Live Verified Student Check-In Roster */}
+                      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h3 className="font-bold text-white text-base">
+                              Live Verified Check-Ins
+                            </h3>
+                            <p className="text-xs text-slate-400 mt-0.5">
+                              Session: {activeSession.courseCode}
+                            </p>
+                          </div>
+                          <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                            {activeSession.markedStudents.length} Present
+                          </span>
+                        </div>
+
+                        {activeSession.markedStudents.length === 0 ? (
+                          <div className="bg-slate-950 border border-slate-800 rounded-xl p-6 text-center space-y-1">
+                            <p className="text-sm font-medium text-slate-300">
+                              No students verified in this window yet.
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              Verified student check-ins for OTP{' '}
+                              <span className="font-mono text-indigo-400">
+                                {activeSession.otp}
+                              </span>{' '}
+                              will appear here immediately.
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {activeSession.markedStudents.map((st) => (
+                              <div
+                                key={st.id}
+                                className="bg-slate-950 border border-slate-800 p-3 rounded-xl flex items-center justify-between"
+                              >
+                                <div>
+                                  <p className="text-sm font-semibold text-white">{st.name}</p>
+                                  <p className="text-xs text-slate-400">Roll No: {st.id}</p>
+                                </div>
+                                <div className="text-right">
+                                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">
+                                    Verified ({st.mode})
+                                  </span>
+                                  <p className="text-[11px] text-slate-500 mt-1">{st.time}</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+
+                  {/* Student Check-In Terminal */}
+                  {role === 'student' && (
+                    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-5 lg:col-span-2 max-w-xl">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <h3 className="font-bold text-white text-base">
+                            Student Check-In Terminal ({currentUser.name})
+                          </h3>
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            Roll No: {currentUser.id} • Active Course:{' '}
+                            <span className="text-indigo-400 font-semibold">
+                              {activeSession.courseCode}
+                            </span>
+                          </p>
+                        </div>
+                        <span
+                          className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+                            activeSession.active
+                              ? 'bg-emerald-500/15 text-emerald-300'
+                              : 'bg-rose-500/15 text-rose-300'
+                          }`}
+                        >
+                          {activeSession.active ? `${activeSession.expiresIn}s left` : 'Closed'}
+                        </span>
+                      </div>
+
+                      {isMarkedByCurrentUser ? (
+                        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-5 text-center space-y-2">
+                          <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-emerald-500/20 text-emerald-300">
+                            <Icons.Check />
+                          </div>
+                          <p className="text-sm font-bold text-emerald-300">
+                            Attendance Verified Successfully!
+                          </p>
+                          <p className="text-xs text-slate-300">
+                            Your presence for {activeSession.courseCode} has been logged and synced to your analytics dashboard.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                              Enter 4-Digit Projector OTP
+                            </label>
+                            <input
+                              type="text"
+                              maxLength={4}
+                              value={studentOtpInput}
+                              onChange={(e) => setStudentOtpInput(e.target.value)}
+                              placeholder={`Enter 4-digit OTP (Live: ${activeSession.otp})`}
+                              className="w-full bg-slate-950 border border-slate-700 focus:border-indigo-500 focus:outline-none rounded-xl px-4 py-3 text-base font-mono tracking-widest text-white"
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <button
+                              onClick={() => handleMarkAttendance('otp')}
+                              className="bg-indigo-600 hover:bg-indigo-500 text-white py-3 rounded-xl text-xs font-semibold transition-colors shadow-lg shadow-indigo-600/20"
+                            >
+                              Submit OTP
+                            </button>
+                            <button
+                              onClick={() => handleMarkAttendance('qr')}
+                              className="bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-xl text-xs font-semibold border border-slate-700 transition-colors"
+                            >
+                              Scan Classroom QR
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
+                  )}
                 </div>
               )}
 
-              {/* TIMETABLE TAB */}
+              {/* ===============================================================
+               * TAB 3: LIVE TIMETABLE
+               * =============================================================== */}
               {activeTab === 'timetable' && (
-                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-                  <h3 className="font-bold text-white text-base mb-4">Dynamic Lecture Timetable</h3>
-                  <div className="space-y-2.5">
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <h3 className="font-bold text-white text-base">Dynamic Lecture Timetable</h3>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        B.Tech CSE 2nd Year (3rd Semester) • Live Room Status
+                      </p>
+                    </div>
+                    <span className="text-xs px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-indigo-300 font-medium">
+                      5 Lectures Today
+                    </span>
+                  </div>
+
+                  <div className="space-y-3">
                     {timetable.map((slot) => (
-                      <div key={slot.id} className="bg-slate-950 border border-slate-800 p-3.5 rounded-xl flex flex-wrap justify-between items-center gap-2">
+                      <div
+                        key={slot.id}
+                        className="bg-slate-950 border border-slate-800/90 p-4 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                      >
                         <div>
-                          <span className="text-xs font-bold text-indigo-400 mr-2">{slot.code}</span>
-                          <span className="text-sm font-semibold text-white">{slot.subject}</span>
-                          <p className="text-xs text-slate-400 mt-0.5">{slot.time} • Room: {slot.room}</p>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-bold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20">
+                              {slot.code}
+                            </span>
+                            <span className="text-sm font-semibold text-white">{slot.subject}</span>
+                          </div>
+                          <p className="text-xs text-slate-400 mt-1.5">
+                            {slot.time} • Room:{' '}
+                            <span className="text-slate-200 font-medium">{slot.room}</span> •{' '}
+                            {slot.faculty}
+                          </p>
                         </div>
-                        <span className={`text-xs px-2.5 py-0.5 rounded-full ${slot.status === 'Scheduled' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'}`}>
+
+                        <span
+                          className={`text-xs font-semibold px-3 py-1 rounded-full self-start sm:self-center border ${
+                            slot.status === 'Scheduled'
+                              ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                              : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                          }`}
+                        >
                           {slot.status}
                         </span>
                       </div>
@@ -424,52 +1148,97 @@
                 </div>
               )}
 
-              {/* ASSIGNMENTS TAB */}
+              {/* ===============================================================
+               * TAB 4: ASSIGNMENTS & LABS
+               * =============================================================== */}
               {activeTab === 'assignments' && (
                 <div className="space-y-6">
-                  {(role === 'faculty' || role === 'admin') && (
-                    <form onSubmit={handleCreateAssignment} className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3">
-                      <h4 className="font-bold text-white text-sm">Post New Coursework Assignment</h4>
+                  {/* Faculty Coursework Creation Form */}
+                  {role === 'faculty' && (
+                    <form
+                      onSubmit={handleCreateAssignment}
+                      className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3.5"
+                    >
+                      <h4 className="font-bold text-white text-sm">
+                        Post New Coursework Assignment
+                      </h4>
                       <div className="flex flex-col sm:flex-row gap-3">
                         <select
                           value={newAssignmentCourse}
                           onChange={(e) => setNewAssignmentCourse(e.target.value)}
-                          className="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
+                          className="bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-indigo-500 focus:outline-none"
                         >
-                          {subjects.map((s) => <option key={s.code} value={s.code}>{s.code}</option>)}
+                          {subjects.map((s) => (
+                            <option key={s.code} value={s.code}>
+                              {s.code}
+                            </option>
+                          ))}
                         </select>
                         <input
                           type="text"
+                          required
                           value={newAssignmentTitle}
                           onChange={(e) => setNewAssignmentTitle(e.target.value)}
-                          placeholder="Assignment title..."
-                          className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white"
+                          placeholder="Enter assignment or lab problem statement..."
+                          className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:border-indigo-500 focus:outline-none"
                         />
-                        <button type="submit" className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-semibold">
-                          Publish
+                        <button
+                          type="submit"
+                          className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-xl text-xs font-semibold transition-colors"
+                        >
+                          Publish Task
                         </button>
                       </div>
                     </form>
                   )}
 
-                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3">
-                    <h3 className="font-bold text-white text-base">Coursework & Lab Submissions (Ayush)</h3>
+                  {/* Assignment List */}
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3.5">
+                    <div>
+                      <h3 className="font-bold text-white text-base">
+                        Coursework & Lab Submissions
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        {role === 'student'
+                          ? 'Upload your completed solutions before the due date.'
+                          : 'Track active coursework published for B.Tech CSE 3rd Semester.'}
+                      </p>
+                    </div>
+
                     {assignments.map((item) => (
-                      <div key={item.id} className="bg-slate-950 border border-slate-800 p-4 rounded-xl flex justify-between items-center gap-4">
+                      <div
+                        key={item.id}
+                        className="bg-slate-950 border border-slate-800/90 p-4 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                      >
                         <div>
-                          <span className="text-xs font-bold text-indigo-400 mr-2">{item.code}</span>
-                          <span className="text-sm font-semibold text-white">{item.title}</span>
-                          <p className="text-xs text-slate-400 mt-1">Due: {item.dueDate} • Status: {item.grade}</p>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-bold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20">
+                              {item.code}
+                            </span>
+                            <span className="text-sm font-semibold text-white">{item.title}</span>
+                          </div>
+                          <p className="text-xs text-slate-400 mt-1.5">
+                            Due: {item.dueDate} • Status:{' '}
+                            <span className="text-slate-200">{item.grade}</span>
+                          </p>
                         </div>
+
                         {item.submitted ? (
-                          <span className="text-xs px-3 py-1.5 rounded-xl bg-emerald-500/20 text-emerald-300 font-semibold">Submitted</span>
-                        ) : (
+                          <span className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-semibold self-start sm:self-center shrink-0">
+                            <Icons.Check />
+                            Submitted
+                          </span>
+                        ) : role === 'student' ? (
                           <button
                             onClick={() => handleSubmitAssignment(item.id)}
-                            className="bg-indigo-600 hover:bg-indigo-500 text-white px-3.5 py-1.5 rounded-xl text-xs font-semibold"
+                            className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-xs font-semibold transition-colors self-start sm:self-center shrink-0"
                           >
                             Upload Solution
                           </button>
+                        ) : (
+                          <span className="text-xs px-3 py-1.5 rounded-xl bg-amber-500/15 text-amber-300 border border-amber-500/30 font-semibold self-start sm:self-center shrink-0">
+                            Pending Submission
+                          </span>
                         )}
                       </div>
                     ))}
@@ -477,34 +1246,73 @@
                 </div>
               )}
 
-              {/* NOTICES TAB */}
+              {/* ===============================================================
+               * TAB 5: DIGITAL NOTICE BOARD
+               * =============================================================== */}
               {activeTab === 'notices' && (
                 <div className="space-y-6">
-                  {(role === 'faculty' || role === 'admin') && (
-                    <form onSubmit={handleAddNotice} className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3">
-                      <h4 className="font-bold text-white text-sm">Broadcast Departmental Notice</h4>
-                      <div className="flex gap-3">
+                  {/* Faculty Notice Broadcast Form */}
+                  {role === 'faculty' && (
+                    <form
+                      onSubmit={handleAddNotice}
+                      className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3.5"
+                    >
+                      <h4 className="font-bold text-white text-sm">
+                        Broadcast Departmental Notice
+                      </h4>
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        <select
+                          value={newNoticeCategory}
+                          onChange={(e) => setNewNoticeCategory(e.target.value)}
+                          className="bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-indigo-500 focus:outline-none"
+                        >
+                          <option value="Academic">Academic</option>
+                          <option value="Examination">Examination</option>
+                          <option value="Technical Event">Technical Event</option>
+                          <option value="Urgent">Urgent</option>
+                        </select>
                         <input
                           type="text"
+                          required
                           value={newNoticeTitle}
                           onChange={(e) => setNewNoticeTitle(e.target.value)}
-                          placeholder="Enter official announcement..."
-                          className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white"
+                          placeholder="Enter official departmental announcement..."
+                          className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:border-indigo-500 focus:outline-none"
                         />
-                        <button type="submit" className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-semibold">
+                        <button
+                          type="submit"
+                          className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl text-xs font-semibold transition-colors"
+                        >
                           Broadcast
                         </button>
                       </div>
                     </form>
                   )}
 
-                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3">
-                    <h3 className="font-bold text-white text-base">Digital Notice Board</h3>
+                  {/* Notice Feed */}
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3.5">
+                    <div>
+                      <h3 className="font-bold text-white text-base">Digital Notice Board</h3>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Official circulars & updates for IET Lucknow CSE Department
+                      </p>
+                    </div>
+
                     {notices.map((n) => (
-                      <div key={n.id} className="bg-slate-950 border border-slate-800 p-4 rounded-xl">
-                        <span className="text-[11px] px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 mr-2">{n.category}</span>
-                        <span className="text-sm font-semibold text-white">{n.title}</span>
-                        <p className="text-xs text-slate-400 mt-1">Posted by {n.author} • {n.date}</p>
+                      <div
+                        key={n.id}
+                        className="bg-slate-950 border border-slate-800/90 p-4 rounded-xl space-y-1.5"
+                      >
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                            {n.category}
+                          </span>
+                          <span className="text-sm font-semibold text-white">{n.title}</span>
+                        </div>
+                        <p className="text-xs text-slate-400">
+                          Posted by <span className="text-slate-300 font-medium">{n.author}</span> •{' '}
+                          {n.date}
+                        </p>
                       </div>
                     ))}
                   </div>
@@ -516,8 +1324,13 @@
       );
     }
 
+    // Mount React Application
     const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<App />);
+    root.render(
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
+    );
   </script>
 </body>
 </html>

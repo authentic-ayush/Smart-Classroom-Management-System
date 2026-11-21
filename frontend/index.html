@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SCMS Portal — IET Lucknow</title>
 
-  <!-- Load Inter Font for modern, clean UI typography -->
+  <!-- Load Inter Font for clean modern UI typography -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -24,6 +24,32 @@
     };
   </script>
 
+  <!-- Custom Keyframes for the Animated QR Scanner Laser Beam -->
+  <style>
+    @keyframes qrScanSweep {
+      0% {
+        top: 6%;
+        opacity: 0.75;
+      }
+      50% {
+        top: 90%;
+        opacity: 1;
+      }
+      100% {
+        top: 6%;
+        opacity: 0.75;
+      }
+    }
+
+    .qr-laser-idle {
+      animation: qrScanSweep 2.4s ease-in-out infinite;
+    }
+
+    .qr-laser-fast {
+      animation: qrScanSweep 0.75s ease-in-out infinite;
+    }
+  </style>
+
   <!-- React 18, ReactDOM 18 & Babel Standalone CDNs -->
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
@@ -34,7 +60,7 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useEffect, Component } = React;
+    const { useState, useEffect, useRef, Component } = React;
 
     /* =========================================================================
      * ERROR BOUNDARY FOR GRACEFUL RUNTIME RECOVERY
@@ -155,8 +181,8 @@
           <rect x="3" y="16" width="7" height="5" rx="1.5" />
         </svg>
       ),
-      Qr: () => (
-        <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
+      Qr: ({ className = 'w-4 h-4 shrink-0' }) => (
+        <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h6v6H3V3zm12 0h6v6h-6V3zM3 15h6v6H3v-6zm12 0h2v2h-2v-2zm4 0h2v2h-2v-2zm-4 4h2v2h-2v-2zm4 0h2v2h-2v-2z" />
         </svg>
       ),
@@ -181,9 +207,14 @@
           <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
         </svg>
       ),
-      Check: () => (
-        <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" aria-hidden="true">
+      Check: ({ className = 'w-4 h-4 shrink-0' }) => (
+        <svg className={className} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
+      ),
+      Close: () => (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
         </svg>
       ),
       Eye: () => (
@@ -200,30 +231,90 @@
     };
 
     /* =========================================================================
-     * DETERMINISTIC SVG QR GRAPHIC FOR FACULTY LIVE ATTENDANCE CONTROLLER
+     * DETERMINISTIC 21x21 QR CODE SVG COMPONENT (100% OFFLINE)
+     * Builds authentic 7x7 finder patterns in three corners, 1-module white
+     * separators, row/col 6 timing patterns, and seeded data modules derived
+     * directly from `SCMS|${courseCode}|${otp}`.
      * ========================================================================= */
-    function SessionQrGraphic({ code }) {
-      const seed = parseInt(code, 10) || 4829;
-      const cells = [];
+    function QRCode({ courseCode, otp, size = 160 }) {
+      const payload = `SCMS|${courseCode}|${otp}`;
+      const gridSize = 21;
 
-      for (let r = 0; r < 7; r++) {
-        for (let c = 0; c < 7; c++) {
-          const isTopLeft = r < 2 && c < 2;
-          const isTopRight = r < 2 && c > 4;
-          const isBottomLeft = r > 4 && c < 2;
-          const isActive =
-            isTopLeft || isTopRight || isBottomLeft || (seed * (r + 3) + c * 17) % 3 !== 0;
+      // Deterministic 32-bit FNV-1a hash seed from payload string
+      let seed = 2166136261;
+      for (let i = 0; i < payload.length; i++) {
+        seed ^= payload.charCodeAt(i);
+        seed = Math.imul(seed, 16777619) >>> 0;
+      }
 
-          if (isActive) {
-            cells.push(
+      // Mulberry32 PRNG for reproducible, evenly distributed data modules
+      const nextBit = () => {
+        seed = (seed + 0x6d2b79f5) >>> 0;
+        let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return (((t ^ (t >>> 14)) >>> 0) / 4294967296) > 0.48;
+      };
+
+      // Helper to stamp a 7x7 QR finder pattern at (startRow, startCol)
+      const isInFinder = (r, c, sr, sc) => {
+        const dr = r - sr;
+        const dc = c - sc;
+        if (dr < 0 || dr > 6 || dc < 0 || dc > 6) return null;
+        // Outer 7x7 border or inner 3x3 center square is dark
+        const isBorder = dr === 0 || dr === 6 || dc === 0 || dc === 6;
+        const isCenter = dr >= 2 && dr <= 4 && dc >= 2 && dc <= 4;
+        return isBorder || isCenter;
+      };
+
+      // Helper to identify 1-module white separator zones around each finder
+      const isSeparator = (r, c) =>
+        (r <= 7 && c <= 7) ||
+        (r <= 7 && c >= 13) ||
+        (r >= 13 && c <= 7);
+
+      const rects = [];
+
+      for (let r = 0; r < gridSize; r++) {
+        for (let c = 0; c < gridSize; c++) {
+          let dark = false;
+
+          // 1. Check the three 7x7 corner finder patterns
+          const tl = isInFinder(r, c, 0, 0);
+          const tr = isInFinder(r, c, 0, 14);
+          const bl = isInFinder(r, c, 14, 0);
+
+          if (tl !== null) {
+            dark = tl;
+          } else if (tr !== null) {
+            dark = tr;
+          } else if (bl !== null) {
+            dark = bl;
+          } else if (isSeparator(r, c)) {
+            // 2. White separator quiet ring around finder patterns
+            dark = false;
+          } else if (r === 6 && c >= 8 && c <= 12) {
+            // 3. Horizontal timing pattern
+            dark = c % 2 === 0;
+          } else if (c === 6 && r >= 8 && r <= 12) {
+            // 4. Vertical timing pattern
+            dark = r % 2 === 0;
+          } else if (r === 13 && c === 8) {
+            // 5. Standard Version-1 fixed dark module
+            dark = true;
+          } else {
+            // 6. Seeded payload data & format modules
+            dark = nextBit();
+          }
+
+          if (dark) {
+            rects.push(
               <rect
                 key={`${r}-${c}`}
-                x={c * 10 + 5}
-                y={r * 10 + 5}
-                width="8"
-                height="8"
-                rx="1.5"
-                fill="currentColor"
+                x={c + 2}
+                y={r + 2}
+                width="1.02"
+                height="1.02"
+                fill="#0f172a"
               />
             );
           }
@@ -231,16 +322,278 @@
       }
 
       return (
-        <div className="inline-flex p-2.5 bg-white text-slate-950 rounded-xl shadow-inner border border-slate-300">
-          <svg width="78" height="78" viewBox="0 0 80 80" aria-label={`QR Code for OTP ${code}`}>
-            {cells}
+        <div
+          className="inline-flex items-center justify-center bg-white rounded-xl p-2 shadow-lg border border-slate-200 select-none"
+          title={`Encrypted QR Payload: ${payload}`}
+        >
+          <svg
+            width={size}
+            height={size}
+            viewBox="0 0 25 25"
+            shapeRendering="crispEdges"
+            role="img"
+            aria-label={`Live QR Code for ${courseCode} session OTP ${otp}`}
+          >
+            <rect x="0" y="0" width="25" height="25" fill="#ffffff" />
+            {rects}
           </svg>
         </div>
       );
     }
 
     /* =========================================================================
-     * MINIMAL LOGIN PAGE COMPONENT (STUDENT & FACULTY ONLY)
+     * INTERACTIVE CLASSROOM QR ATTENDANCE SCANNER MODAL
+     * Three visual states:
+     *   1. "ready"    -> Live QR code inside viewfinder + Scan & Verify / Cancel
+     *   2. "scanning" -> 1.5s accelerated glowing laser beam verification
+     *   3. "verified" -> Green checkmark + decoded token + Done button
+     * Canceling before scanning finishes never marks attendance.
+     * ========================================================================= */
+    function QrScannerModal({
+      isOpen,
+      onClose,
+      activeSession,
+      subjectInfo,
+      currentUser,
+      onVerifySuccess,
+    }) {
+      const [scanState, setScanState] = useState('ready'); // 'ready' | 'scanning' | 'verified'
+      const [verifiedToken, setVerifiedToken] = useState('');
+      const scanTimerRef = useRef(null);
+
+      // Reset modal state whenever opened or closed, and clean up pending timers
+      useEffect(() => {
+        if (isOpen) {
+          setScanState('ready');
+          setVerifiedToken('');
+        }
+        return () => {
+          if (scanTimerRef.current) {
+            clearTimeout(scanTimerRef.current);
+            scanTimerRef.current = null;
+          }
+        };
+      }, [isOpen]);
+
+      // Abort any active scan if the live 120s session expires mid-scan
+      useEffect(() => {
+        if (!activeSession.active && scanState === 'scanning') {
+          if (scanTimerRef.current) {
+            clearTimeout(scanTimerRef.current);
+            scanTimerRef.current = null;
+          }
+          setScanState('ready');
+        }
+      }, [activeSession.active, scanState]);
+
+      if (!isOpen) return null;
+
+      // Cancel safely without marking attendance
+      const handleCancel = () => {
+        if (scanTimerRef.current) {
+          clearTimeout(scanTimerRef.current);
+          scanTimerRef.current = null;
+        }
+        onClose();
+      };
+
+      // Begin 1.5s encrypted QR token verification animation
+      const handleStartScan = () => {
+        if (!activeSession.active || scanState !== 'ready') return;
+        setScanState('scanning');
+
+        const tokenSnapshot = `SCMS-${activeSession.courseCode}-${activeSession.otp}`;
+
+        scanTimerRef.current = setTimeout(() => {
+          scanTimerRef.current = null;
+          const success = onVerifySuccess();
+          if (success) {
+            setVerifiedToken(tokenSnapshot);
+            setScanState('verified');
+          } else {
+            setScanState('ready');
+          }
+        }, 1500);
+      };
+
+      return (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="qr-modal-title"
+        >
+          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl shadow-black/70 overflow-hidden">
+            {/* Modal Header */}
+            <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-indigo-500/15 border border-indigo-500/35 text-indigo-400 flex items-center justify-center shrink-0">
+                  <Icons.Qr className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 id="qr-modal-title" className="text-sm font-bold text-white leading-tight">
+                    Classroom QR Attendance Scanner
+                  </h3>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    {activeSession.courseCode} • Room {subjectInfo?.room || 'LH-201'}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleCancel}
+                aria-label="Close scanner"
+                className="text-slate-400 hover:text-white hover:bg-slate-800 p-1.5 rounded-xl transition-colors"
+              >
+                <Icons.Close />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 sm:p-6 space-y-5">
+              {/* Session Metadata Bar */}
+              <div className="flex items-center justify-between gap-2 bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-white truncate">
+                    {subjectInfo?.name || activeSession.courseCode}
+                  </p>
+                  <p className="text-[11px] text-slate-400">
+                    Faculty: {subjectInfo?.faculty || 'Er. Nitika Gupta'}
+                  </p>
+                </div>
+                <span
+                  className={`text-[11px] font-bold px-2.5 py-1 rounded-full shrink-0 border ${
+                    activeSession.active
+                      ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                      : 'bg-rose-500/15 text-rose-300 border-rose-500/30'
+                  }`}
+                >
+                  {activeSession.active ? `${activeSession.expiresIn}s left` : 'Expired'}
+                </span>
+              </div>
+
+              {/* STATE 1 & 2: VIEWFINDER FRAME WITH LIVE QR CODE & ANIMATED LASER */}
+              {scanState !== 'verified' ? (
+                <div className="space-y-4">
+                  <div className="relative mx-auto w-64 h-64 bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-center overflow-hidden shadow-inner">
+                    {/* Subtle viewfinder grid tint */}
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(99,102,241,0.12)_0%,_transparent_70%)] pointer-events-none" />
+
+                    {/* Indigo Corner Viewfinder Brackets */}
+                    <span className="absolute top-3.5 left-3.5 w-7 h-7 border-t-4 border-l-4 border-indigo-400 rounded-tl-lg pointer-events-none" />
+                    <span className="absolute top-3.5 right-3.5 w-7 h-7 border-t-4 border-r-4 border-indigo-400 rounded-tr-lg pointer-events-none" />
+                    <span className="absolute bottom-3.5 left-3.5 w-7 h-7 border-b-4 border-l-4 border-indigo-400 rounded-bl-lg pointer-events-none" />
+                    <span className="absolute bottom-3.5 right-3.5 w-7 h-7 border-b-4 border-r-4 border-indigo-400 rounded-br-lg pointer-events-none" />
+
+                    {/* Live Classroom Session QR Code */}
+                    <div
+                      className={`relative z-10 transition-transform duration-300 ${
+                        scanState === 'scanning' ? 'scale-105' : 'scale-100'
+                      }`}
+                    >
+                      <QRCode
+                        courseCode={activeSession.courseCode}
+                        otp={activeSession.otp}
+                        size={168}
+                      />
+                    </div>
+
+                    {/* Animated Glowing Laser Scan Line */}
+                    {activeSession.active && (
+                      <div
+                        className={`absolute left-4 right-4 z-20 h-0.5 rounded-full pointer-events-none ${
+                          scanState === 'scanning'
+                            ? 'bg-emerald-400 shadow-[0_0_16px_4px_rgba(52,211,153,0.9)] qr-laser-fast'
+                            : 'bg-indigo-400 shadow-[0_0_14px_3px_rgba(129,140,248,0.85)] qr-laser-idle'
+                        }`}
+                      />
+                    )}
+                  </div>
+
+                  {/* Instruction / Live Status Text */}
+                  <div className="text-center space-y-1">
+                    {!activeSession.active ? (
+                      <p className="text-xs font-semibold text-rose-400">
+                        Attendance session expired. Please wait for faculty to open a new QR window.
+                      </p>
+                    ) : scanState === 'scanning' ? (
+                      <div className="inline-flex items-center gap-2 text-xs font-semibold text-emerald-300">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                        <span>Scanning &amp; verifying encrypted QR token...</span>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-300">
+                        Align classroom QR code inside the frame
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="grid grid-cols-2 gap-3 pt-1">
+                    <button
+                      type="button"
+                      onClick={handleCancel}
+                      className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold py-2.5 rounded-xl text-xs border border-slate-700 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!activeSession.active || scanState === 'scanning'}
+                      onClick={handleStartScan}
+                      className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-600/40 disabled:text-indigo-200/60 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-xl text-xs transition-all shadow-lg shadow-indigo-600/25"
+                    >
+                      {scanState === 'scanning' ? 'Verifying...' : 'Scan & Verify QR'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* STATE 3: VERIFIED CONFIRMATION SCREEN */
+                <div className="space-y-5 py-2 text-center">
+                  <div className="mx-auto w-16 h-16 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 flex items-center justify-center shadow-lg shadow-emerald-500/15">
+                    <Icons.Check className="w-9 h-9" />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <span className="inline-block text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                      Presence Recorded
+                    </span>
+                    <h4 className="text-base font-bold text-white">
+                      QR Verified! Attendance Marked for {currentUser.name}
+                    </h4>
+                    <p className="text-xs text-slate-400">
+                      Roll No: {currentUser.id} • {activeSession.courseCode} updated in real time.
+                    </p>
+                  </div>
+
+                  {/* Decoded Token Box */}
+                  <div className="bg-slate-950 border border-emerald-500/25 rounded-xl p-3 space-y-1">
+                    <p className="text-[10px] uppercase tracking-wider font-semibold text-slate-400">
+                      Decoded Session Token
+                    </p>
+                    <p className="text-sm font-mono font-bold text-emerald-400 tracking-wider">
+                      {verifiedToken}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 rounded-xl text-sm transition-colors shadow-lg shadow-emerald-600/25"
+                  >
+                    Done
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    /* =========================================================================
+     * MINIMAL 2-ROLE LOGIN PAGE COMPONENT (STUDENT & FACULTY ONLY)
      * ========================================================================= */
     function LoginPage({ onLogin }) {
       const [selectedRole, setSelectedRole] = useState('student');
@@ -249,7 +602,7 @@
       const [showPassword, setShowPassword] = useState(false);
       const [error, setError] = useState('');
 
-      // Validate credentials against Student and Faculty accounts
+      // Authenticate against Student or Faculty account credentials
       const handleSubmit = (e) => {
         e.preventDefault();
         try {
@@ -277,9 +630,9 @@
       };
 
       return (
-        <div className="min-h-screen w-full flex items-center justify-center p-4 sm:p-6 bg-[#070b1a] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-950/60 via-[#070b1a] to-[#050814]">
-          <div className="w-full max-w-md bg-[#0d1226]/95 backdrop-blur-xl border border-slate-800/90 rounded-2xl shadow-2xl shadow-black/60 p-7 sm:p-8 space-y-6">
-            {/* 1, 2, 3: Top Icon Box, Title & Muted Subtitle */}
+        <div className="min-h-screen w-full flex items-center justify-center p-4 sm:p-6 bg-slate-950">
+          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl shadow-black/60 p-7 sm:p-8 space-y-6">
+            {/* Top Graduation Cap Icon, Title & Subtitle */}
             <div className="text-center space-y-3">
               <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-500/15 border border-indigo-500/35 text-indigo-400 shadow-lg shadow-indigo-500/10">
                 <Icons.Cap className="w-7 h-7" />
@@ -294,8 +647,8 @@
               </div>
             </div>
 
-            {/* 4: 2-Column Segmented Role Toggle (Student / Faculty ONLY) */}
-            <div className="grid grid-cols-2 gap-1.5 bg-[#060917] p-1.5 rounded-xl border border-slate-800/90">
+            {/* 2-Tab Role Selector ONLY (Student / Faculty) */}
+            <div className="grid grid-cols-2 gap-1.5 bg-slate-950 p-1.5 rounded-xl border border-slate-800">
               {[
                 { id: 'student', label: 'Student' },
                 { id: 'faculty', label: 'Faculty' },
@@ -309,8 +662,8 @@
                   }}
                   className={`py-2.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
                     selectedRole === r.id
-                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/40'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/70'
+                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/35'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
                   }`}
                 >
                   {r.label}
@@ -318,7 +671,7 @@
               ))}
             </div>
 
-            {/* Inline Error Banner (rendered only on invalid login) */}
+            {/* Inline Validation Error Banner */}
             {error && (
               <div
                 role="alert"
@@ -328,7 +681,7 @@
               </div>
             )}
 
-            {/* 5, 6, 7: Login Form & Vibrant Submit Button */}
+            {/* Login Form */}
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label
@@ -348,7 +701,7 @@
                       ? 'e.g. 2500520100122'
                       : 'faculty@ietlucknow.ac.in'
                   }
-                  className="w-full bg-[#060917] border border-slate-700/80 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 transition-all"
+                  className="w-full bg-slate-950 border border-slate-700/80 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 transition-all"
                 />
               </div>
 
@@ -367,7 +720,7 @@
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
-                    className="w-full bg-[#060917] border border-slate-700/80 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none rounded-xl pl-4 pr-11 py-3 text-sm text-white placeholder-slate-500 transition-all"
+                    className="w-full bg-slate-950 border border-slate-700/80 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none rounded-xl pl-4 pr-11 py-3 text-sm text-white placeholder-slate-500 transition-all"
                   />
                   <button
                     type="button"
@@ -395,7 +748,7 @@
     }
 
     /* =========================================================================
-     * MAIN SCMS PORTAL APPLICATION (STUDENT & FACULTY DASHBOARD)
+     * MAIN SCMS PORTAL APPLICATION (STUDENT & FACULTY 5-TAB DASHBOARD)
      * ========================================================================= */
     function App() {
       const [currentUser, setCurrentUser] = useState(null);
@@ -405,7 +758,7 @@
       const [assignments, setAssignments] = useState(INITIAL_ASSIGNMENTS);
       const [notices, setNotices] = useState(INITIAL_NOTICES);
 
-      // Active Smart Classroom OTP/QR session state
+      // Live Smart Classroom OTP & QR Session State
       const [activeSession, setActiveSession] = useState({
         active: true,
         courseCode: 'BCS-301',
@@ -413,6 +766,9 @@
         expiresIn: 120,
         markedStudents: [],
       });
+
+      // Student QR Scanner Modal State
+      const [qrModalOpen, setQrModalOpen] = useState(false);
 
       // Interactive input and feedback states
       const [studentOtpInput, setStudentOtpInput] = useState('');
@@ -423,7 +779,7 @@
       const [newAssignmentTitle, setNewAssignmentTitle] = useState('');
       const [newAssignmentCourse, setNewAssignmentCourse] = useState('BCS-301');
 
-      // Show toast notification banner (never uses browser alert())
+      // Show toast notification popup (never uses browser alert())
       const triggerToast = (message, tone = 'indigo') => {
         setToast({ message, tone });
       };
@@ -449,13 +805,14 @@
         return () => clearInterval(interval);
       }, [activeSession.active]);
 
-      // Render minimal Login Page if unauthenticated
+      // Render Login Page when unauthenticated
       if (!currentUser) {
         return (
           <LoginPage
             onLogin={(user) => {
               setCurrentUser(user);
               setActiveTab('dashboard');
+              setQrModalOpen(false);
               triggerToast(`Welcome back, ${user.name}!`, 'emerald');
             }}
           />
@@ -467,6 +824,7 @@
       const isMarkedByCurrentUser = activeSession.markedStudents.some(
         (s) => s.id === currentUser.id
       );
+      const activeSubjectInfo = subjects.find((s) => s.code === activeSession.courseCode);
       const totalAttended = subjects.reduce((acc, s) => acc + s.attended, 0);
       const totalClasses = subjects.reduce((acc, s) => acc + s.total, 0);
       const overallPercentage =
@@ -474,7 +832,7 @@
       const pendingAssignmentsCount = assignments.filter((a) => !a.submitted).length;
       const latestNotice = notices[0];
 
-      // Faculty: Generate fresh random 4-digit OTP and restart 120s window
+      // Faculty: Generate fresh random 4-digit OTP + dynamic QR Code & restart 120s timer
       const handleGenerateOtp = () => {
         const randomOtp = Math.floor(1000 + Math.random() * 9000).toString();
         setActiveSession({
@@ -485,27 +843,30 @@
           markedStudents: [],
         });
         triggerToast(
-          `Live OTP ${randomOtp} generated for ${selectedCourseForOtp} (120s window)!`,
+          `Live OTP ${randomOtp} & QR Code generated for ${selectedCourseForOtp} (120s window)!`,
           'emerald'
         );
       };
 
-      // Student: Verify presence using 4-digit OTP or simulated QR check-in
-      const handleMarkAttendance = (mode = 'otp') => {
+      // Shared attendance recording handler (used by OTP button and after QR modal completes)
+      const recordStudentAttendance = (mode = 'otp') => {
         if (!activeSession.active) {
-          return triggerToast(
+          triggerToast(
             'Attendance window has expired. Wait for faculty to open a new session.',
             'rose'
           );
+          return false;
         }
         if (isMarkedByCurrentUser) {
-          return triggerToast('Your attendance is already recorded for this session.', 'indigo');
+          triggerToast('Your attendance is already recorded for this session.', 'indigo');
+          return false;
         }
         if (mode === 'otp' && studentOtpInput.trim() !== activeSession.otp) {
-          return triggerToast(
+          triggerToast(
             `Invalid OTP! Enter the live 4-digit code displayed by faculty (${activeSession.otp}).`,
             'rose'
           );
+          return false;
         }
 
         setSubjects((prev) =>
@@ -540,9 +901,24 @@
           `Attendance verified (${mode.toUpperCase()}) for ${currentUser.name} (${currentUser.id}) in ${activeSession.courseCode}!`,
           'emerald'
         );
+        return true;
       };
 
-      // Student: Upload solution for a pending coursework task
+      // Open Interactive Classroom QR Scanner Modal (NEVER marks attendance immediately)
+      const handleOpenQrScanner = () => {
+        if (!activeSession.active) {
+          return triggerToast(
+            'No active QR attendance session running. Wait for faculty to start one.',
+            'rose'
+          );
+        }
+        if (isMarkedByCurrentUser) {
+          return triggerToast('Your attendance is already marked for this session.', 'indigo');
+        }
+        setQrModalOpen(true);
+      };
+
+      // Student: Upload solution for a pending coursework assignment
       const handleSubmitAssignment = (id) => {
         setAssignments((prev) =>
           prev.map((a) =>
@@ -604,6 +980,16 @@
 
       return (
         <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100">
+          {/* Interactive Classroom QR Attendance Scanner Modal */}
+          <QrScannerModal
+            isOpen={qrModalOpen}
+            onClose={() => setQrModalOpen(false)}
+            activeSession={activeSession}
+            subjectInfo={activeSubjectInfo}
+            currentUser={currentUser}
+            onVerifySuccess={() => recordStudentAttendance('qr')}
+          />
+
           {/* Bottom-Right Interactive Toast Notification */}
           {toast && (
             <div
@@ -644,7 +1030,7 @@
                 </div>
               </div>
 
-              {/* Active User Info Badge & Logout Action */}
+              {/* Active User Info Badge & Logout Button */}
               <div className="flex items-center gap-2.5 sm:gap-3 ml-auto">
                 <div className="text-right bg-slate-800/60 px-3 py-1.5 rounded-xl border border-slate-700/80">
                   <div className="flex items-center justify-end gap-1.5">
@@ -662,6 +1048,7 @@
 
                 <button
                   onClick={() => {
+                    setQrModalOpen(false);
                     setCurrentUser(null);
                     setStudentOtpInput('');
                   }}
@@ -784,12 +1171,12 @@
                       </h2>
                       <p className="text-xs text-slate-300">
                         {role === 'student'
-                          ? 'Enter the live 4-digit OTP displayed on the projector screen or simulate a QR scan.'
+                          ? 'Enter the live 4-digit OTP displayed on the projector screen or open the QR scanner.'
                           : 'Generate new OTP/QR sessions and monitor live verified student check-ins.'}
                       </p>
                     </div>
 
-                    {/* Student Check-In Controls */}
+                    {/* Student Check-In Controls (Simulate QR opens Interactive Scanner Modal) */}
                     {role === 'student' && activeSession.active && !isMarkedByCurrentUser && (
                       <div className="flex flex-wrap items-center gap-2">
                         <input
@@ -801,16 +1188,17 @@
                           className="bg-slate-950 border border-slate-700 focus:border-indigo-500 focus:outline-none rounded-xl px-3.5 py-2.5 text-sm text-white w-32 font-mono tracking-widest"
                         />
                         <button
-                          onClick={() => handleMarkAttendance('otp')}
+                          onClick={() => recordStudentAttendance('otp')}
                           className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-xl text-xs font-semibold transition-colors"
                         >
                           Verify OTP
                         </button>
                         <button
-                          onClick={() => handleMarkAttendance('qr')}
-                          className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3.5 py-2.5 rounded-xl text-xs font-semibold border border-slate-700 transition-colors"
+                          onClick={handleOpenQrScanner}
+                          className="inline-flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 px-3.5 py-2.5 rounded-xl text-xs font-semibold border border-slate-700 transition-colors"
                         >
-                          Simulate QR
+                          <Icons.Qr className="w-3.5 h-3.5" />
+                          <span>Simulate QR</span>
                         </button>
                       </div>
                     )}
@@ -908,16 +1296,16 @@
                * =============================================================== */}
               {activeTab === 'attendance' && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Faculty OTP / QR Session Controller */}
+                  {/* Faculty OTP & QR Session Controller */}
                   {role === 'faculty' && (
                     <>
                       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
                         <div>
                           <h3 className="font-bold text-white text-base">
-                            Faculty OTP / QR Session Controller
+                            Faculty OTP &amp; QR Session Controller
                           </h3>
                           <p className="text-xs text-slate-400 mt-0.5">
-                            Generate a time-bound 4-digit OTP and QR code to prevent proxy attendance.
+                            Generate a synchronized 4-digit OTP and dynamic Classroom QR Code with a 120-second validity window.
                           </p>
                         </div>
 
@@ -942,15 +1330,16 @@
                           onClick={handleGenerateOtp}
                           className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 rounded-xl text-sm transition-colors shadow-lg shadow-emerald-600/20"
                         >
-                          Generate New Live OTP & QR Session
+                          Generate New Live OTP &amp; QR Session
                         </button>
 
-                        <div className="bg-slate-950 border border-slate-800 rounded-2xl p-5 flex flex-col sm:flex-row items-center justify-around gap-4 text-center">
-                          <div>
+                        {/* Side-by-Side Live 4-Digit OTP + Dynamic 21x21 Classroom QR Code */}
+                        <div className="bg-slate-950 border border-slate-800 rounded-2xl p-5 flex flex-col sm:flex-row items-center justify-around gap-5 text-center">
+                          <div className="space-y-1.5">
                             <p className="text-xs text-slate-400">
-                              Active Code for {activeSession.courseCode}
+                              Active Code for <span className="text-white font-semibold">{activeSession.courseCode}</span>
                             </p>
-                            <p className="text-4xl font-extrabold tracking-[0.25em] text-indigo-400 my-2 font-mono">
+                            <p className="text-4xl font-extrabold tracking-[0.25em] text-indigo-400 font-mono">
                               {activeSession.active ? activeSession.otp : '----'}
                             </p>
                             <p
@@ -962,8 +1351,33 @@
                                 ? `Expires in ${activeSession.expiresIn} seconds`
                                 : 'Session Expired'}
                             </p>
+                            {activeSession.active && (
+                              <p className="text-[10px] font-mono text-slate-500 pt-1">
+                                Token: SCMS|{activeSession.courseCode}|{activeSession.otp}
+                              </p>
+                            )}
                           </div>
-                          {activeSession.active && <SessionQrGraphic code={activeSession.otp} />}
+
+                          <div className="flex flex-col items-center gap-1.5">
+                            {activeSession.active ? (
+                              <>
+                                <QRCode
+                                  courseCode={activeSession.courseCode}
+                                  otp={activeSession.otp}
+                                  size={136}
+                                />
+                                <span className="text-[10px] text-slate-400 font-medium">
+                                  Live Classroom QR Code
+                                </span>
+                              </>
+                            ) : (
+                              <div className="w-36 h-36 rounded-xl bg-slate-900 border border-dashed border-slate-700 flex items-center justify-center p-3 text-center">
+                                <span className="text-xs text-slate-500">
+                                  Generate a new session to display QR Code
+                                </span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -975,7 +1389,7 @@
                               Live Verified Check-Ins
                             </h3>
                             <p className="text-xs text-slate-400 mt-0.5">
-                              Session: {activeSession.courseCode}
+                              Session: {activeSession.courseCode} • Room {activeSubjectInfo?.room || 'LH-201'}
                             </p>
                           </div>
                           <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
@@ -1077,16 +1491,17 @@
 
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <button
-                              onClick={() => handleMarkAttendance('otp')}
+                              onClick={() => recordStudentAttendance('otp')}
                               className="bg-indigo-600 hover:bg-indigo-500 text-white py-3 rounded-xl text-xs font-semibold transition-colors shadow-lg shadow-indigo-600/20"
                             >
                               Submit OTP
                             </button>
                             <button
-                              onClick={() => handleMarkAttendance('qr')}
-                              className="bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-xl text-xs font-semibold border border-slate-700 transition-colors"
+                              onClick={handleOpenQrScanner}
+                              className="inline-flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-xl text-xs font-semibold border border-slate-700 transition-colors"
                             >
-                              Scan Classroom QR
+                              <Icons.Qr className="w-4 h-4" />
+                              <span>Scan Classroom QR</span>
                             </button>
                           </div>
                         </div>
@@ -1196,7 +1611,7 @@
                   <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3.5">
                     <div>
                       <h3 className="font-bold text-white text-base">
-                        Coursework & Lab Submissions
+                        Coursework &amp; Lab Submissions
                       </h3>
                       <p className="text-xs text-slate-400 mt-0.5">
                         {role === 'student'
@@ -1294,7 +1709,7 @@
                     <div>
                       <h3 className="font-bold text-white text-base">Digital Notice Board</h3>
                       <p className="text-xs text-slate-400 mt-0.5">
-                        Official circulars & updates for IET Lucknow CSE Department
+                        Official circulars &amp; updates for IET Lucknow CSE Department
                       </p>
                     </div>
 
